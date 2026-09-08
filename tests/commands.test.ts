@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { SLASH_COMMANDS, registerSlashCommands } from '../src/discord/commands.js';
+import {
+  SLASH_COMMANDS,
+  registerSlashCommands,
+  clearGuildSlashCommands,
+} from '../src/discord/commands.js';
 
 describe('Discord Slash Commands', () => {
   it('should define public commands and admin commands with permissions', () => {
@@ -42,6 +46,35 @@ describe('Discord Slash Commands', () => {
           'Content-Type': 'application/json',
           Authorization: 'Bot bot-token-xyz',
         },
+      })
+    );
+  });
+
+  it('should clear guild-specific slash commands to avoid duplicates', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
+
+    global.fetch = mockFetch;
+
+    const success = await clearGuildSlashCommands({
+      applicationId: 'app-123',
+      botToken: 'bot-token-xyz',
+      guildId: 'guild-456',
+    });
+
+    expect(success).toBe(true);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://discord.com/api/v10/applications/app-123/guilds/guild-456/commands',
+      expect.objectContaining({
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: 'Bot bot-token-xyz',
+        },
+        body: JSON.stringify([]),
       })
     );
   });

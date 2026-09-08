@@ -155,3 +155,40 @@ export async function registerSlashCommands(options?: {
   logger.info(`Successfully registered ${(result as any[]).length} slash commands!`);
   return true;
 }
+
+/**
+ * Clears guild-specific slash commands so that only global commands exist (eliminates duplicates).
+ */
+export async function clearGuildSlashCommands(options: {
+  applicationId?: string;
+  botToken?: string;
+  guildId: string;
+}): Promise<boolean> {
+  const appId = options.applicationId || config.discord.applicationId;
+  const token = options.botToken || config.discord.botToken;
+
+  if (!appId || !token) {
+    throw new Error('Cannot clear commands: DISCORD_APPLICATION_ID and DISCORD_BOT_TOKEN are required');
+  }
+
+  const url = `https://discord.com/api/v10/applications/${appId}/guilds/${options.guildId}/commands`;
+  logger.info(`Clearing guild slash commands at ${url}`);
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bot ${token}`,
+    },
+    body: JSON.stringify([]),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    logger.error(`Failed to clear guild slash commands [${response.status}]`, errText);
+    throw new Error(`Discord API error [${response.status}]: ${errText}`);
+  }
+
+  logger.info(`Successfully cleared guild slash commands for guild ${options.guildId}`);
+  return true;
+}

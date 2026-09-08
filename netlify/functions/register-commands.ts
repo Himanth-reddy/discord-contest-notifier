@@ -1,28 +1,41 @@
 import { Handler } from '@netlify/functions';
-import { registerSlashCommands, SLASH_COMMANDS } from '../../src/discord/commands.js';
+import {
+  registerSlashCommands,
+  clearGuildSlashCommands,
+  SLASH_COMMANDS,
+} from '../../src/discord/commands.js';
 import { runMigrations } from '../../src/database/migrate.js';
 import { logger } from '../../src/utils/logger.js';
 
 export const handler: Handler = async (event) => {
-  logger.info('Registering slash commands with Discord API');
+  logger.info('Registering/cleaning slash commands with Discord API');
   try {
     const guildId = event.queryStringParameters?.guildId || '1546470499385741312';
+    const mode = event.queryStringParameters?.mode || 'clean';
 
     // Ensure database tables and seeded platforms exist
     await runMigrations();
 
-    // Register to specific guild for INSTANT (0-second) cache update
-    await registerSlashCommands({ guildId });
-
-    // Also register globally
-    await registerSlashCommands();
+    if (mode === 'clean') {
+      // 1. Register globally
+      await registerSlashCommands();
+      // 2. Clear guild-specific commands so they don't show up twice in the server
+      if (guildId) {
+        await clearGuildSlashCommands({ guildId });
+      }
+    } else if (mode === 'guild-only') {
+      await registerSlashCommands({ guildId });
+    } else if (mode === 'global-only') {
+      await registerSlashCommands();
+    }
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message: 'Successfully registered slash commands globally and to server!',
+        message: 'Successfully updated slash commands without duplicates!',
         guildId,
+        mode,
         commands: SLASH_COMMANDS.map((c) => `/${c.name}`),
       }),
     };
