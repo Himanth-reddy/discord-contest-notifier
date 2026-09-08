@@ -29,7 +29,6 @@ export class ClistClient {
 
   /**
    * Normalizes a raw CLIST contest resource/host to a clean platform slug.
-   * e.g. "codeforces.com" -> "codeforces", "atcoder.jp" -> "atcoder"
    */
   public normalizePlatform(rawResource: string): string {
     const resource = (rawResource || '').toLowerCase().trim();
@@ -38,17 +37,23 @@ export class ClistClient {
     if (resource.includes('atcoder')) return 'atcoder';
     if (resource.includes('codechef')) return 'codechef';
     if (resource.includes('hackerrank')) return 'hackerrank';
+    if (resource.includes('hackerearth')) return 'hackerearth';
     if (resource.includes('topcoder')) return 'topcoder';
     if (resource.includes('kaggle')) return 'kaggle';
     if (resource.includes('geeksforgeeks')) return 'geeksforgeeks';
+    if (resource.includes('csacademy')) return 'csacademy';
+    if (resource.includes('dmoj')) return 'dmoj';
+    if (resource.includes('luogu')) return 'luogu';
+    if (resource.includes('nowcoder') || resource === 'ac' || resource.includes('ac.nowcoder')) return 'nowcoder';
+    if (resource.includes('ctftime')) return 'ctftime';
+    if (resource.includes('yukicoder')) return 'yukicoder';
+    if (resource.includes('toph')) return 'toph';
 
-    // Default: strip TLD (.com, .org, etc.)
     return resource.split('.')[0] || resource;
   }
 
   /**
    * Parses CLIST date strings into canonical UTC Date instances.
-   * CLIST dates are formatted as "YYYY-MM-DDTHH:mm:ss" or "YYYY-MM-DD HH:mm:ss" in UTC.
    */
   public parseUtcDate(dateStr?: string | null): Date | null {
     if (!dateStr) return null;

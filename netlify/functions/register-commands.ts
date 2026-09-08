@@ -2,15 +2,23 @@ import { Handler } from '@netlify/functions';
 import { registerSlashCommands, SLASH_COMMANDS } from '../../src/discord/commands.js';
 import { logger } from '../../src/utils/logger.js';
 
-export const handler: Handler = async () => {
+export const handler: Handler = async (event) => {
   logger.info('Registering slash commands with Discord API');
   try {
+    const guildId = event.queryStringParameters?.guildId || '1546470499385741312';
+
+    // Register to specific guild for INSTANT (0-second) cache update
+    await registerSlashCommands({ guildId });
+
+    // Also register globally
     await registerSlashCommands();
+
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        message: 'Successfully registered slash commands with Discord!',
+        message: 'Successfully registered slash commands globally and to server!',
+        guildId,
         commands: SLASH_COMMANDS.map((c) => `/${c.name}`),
       }),
     };

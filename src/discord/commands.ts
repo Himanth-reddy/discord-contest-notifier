@@ -2,6 +2,7 @@ import { config } from '../config.js';
 import { ALL_PLATFORMS } from '../contests/types.js';
 import { logger } from '../utils/logger.js';
 
+// Discord slash command choices limit is 25 items
 const platformChoices = ALL_PLATFORMS.map((p) => ({
   name: p.name,
   value: p.id,
@@ -112,21 +113,28 @@ export const SLASH_COMMANDS = [
 ];
 
 /**
- * Registers slash commands with Discord REST API globally.
+ * Registers slash commands with Discord REST API.
+ * If guildId is provided, registers to the guild for INSTANT updates.
+ * Otherwise registers globally.
  */
 export async function registerSlashCommands(options?: {
   applicationId?: string;
   botToken?: string;
+  guildId?: string;
 }): Promise<boolean> {
   const appId = options?.applicationId || config.discord.applicationId;
   const token = options?.botToken || config.discord.botToken;
+  const guildId = options?.guildId;
 
   if (!appId || !token) {
     throw new Error('Cannot register commands: DISCORD_APPLICATION_ID and DISCORD_BOT_TOKEN are required');
   }
 
-  const url = `https://discord.com/api/v10/applications/${appId}/commands`;
-  logger.info(`Registering ${SLASH_COMMANDS.length} slash commands globally at ${url}`);
+  const url = guildId
+    ? `https://discord.com/api/v10/applications/${appId}/guilds/${guildId}/commands`
+    : `https://discord.com/api/v10/applications/${appId}/commands`;
+
+  logger.info(`Registering ${SLASH_COMMANDS.length} slash commands at ${url}`);
 
   const response = await fetch(url, {
     method: 'PUT',

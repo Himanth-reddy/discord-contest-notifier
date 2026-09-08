@@ -61,10 +61,18 @@ export const ALL_PLATFORMS: PlatformInfo[] = [
   { id: 'codechef', name: 'CodeChef', description: 'Starters, Cook-Offs, Lunchtimes' },
   { id: 'leetcode', name: 'LeetCode', description: 'Weekly & Biweekly Contests' },
   { id: 'atcoder', name: 'AtCoder', description: 'Beginner (ABC), Regular (ARC), Grand (AGC)' },
-  { id: 'hackerrank', name: 'HackerRank', description: 'HackerRank Contests' },
+  { id: 'hackerrank', name: 'HackerRank', description: 'Algorithms & Coding Challenges' },
+  { id: 'hackerearth', name: 'HackerEarth', description: 'Circuit, Easy, and Hackathons' },
   { id: 'topcoder', name: 'TopCoder', description: 'Single Round Matches (SRM)' },
-  { id: 'kaggle', name: 'Kaggle', description: 'ML & Data Science Competitions' },
   { id: 'geeksforgeeks', name: 'GeeksforGeeks', description: 'Weekly Contests & Bi-Wizard' },
+  { id: 'kaggle', name: 'Kaggle', description: 'ML & Data Science Competitions' },
+  { id: 'csacademy', name: 'CS Academy', description: 'Algorithms Rounds' },
+  { id: 'dmoj', name: 'DMOJ', description: 'High School & Open Contests' },
+  { id: 'luogu', name: 'Luogu (洛谷)', description: 'ICPC, Provincial, and Open Contests' },
+  { id: 'nowcoder', name: 'NowCoder (牛客网)', description: 'ACM & IOI Style Contests' },
+  { id: 'ctftime', name: 'CTFtime', description: 'Capture The Flag Cybersecurity Contests' },
+  { id: 'yukicoder', name: 'Yukicoder', description: 'Japanese Competitive Programming' },
+  { id: 'toph', name: 'Toph', description: 'Bangladesh Programming Contests' },
 ];
 
 export const DEFAULT_PLATFORMS: string[] = ['codeforces', 'codechef', 'leetcode'];
