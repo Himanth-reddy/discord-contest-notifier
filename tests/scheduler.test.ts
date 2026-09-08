@@ -271,4 +271,42 @@ describe('Notification Scheduler & Execution Logic', () => {
       expect.objectContaining({ channelId: 'chan-lc' })
     );
   });
+
+  it('should unclaim notification and throw error if all Discord deliveries fail so QStash retries', async () => {
+    const contest = (
+      await repo.upsertContest({
+        externalId: 'cf-fail-1',
+        platform: 'codeforces',
+        name: 'Codeforces Failing Round',
+        url: 'https://codeforces.com/contest/fail',
+        startTime: new Date(Date.now() - 1000), // started 1 sec ago
+        endTime: new Date(Date.now() + 3600 * 1000),
+        duration: 3600,
+        status: 'SCHEDULED',
+      })
+    ).contest;
+
+    await repo.upsertServer({
+      guildId: 'server-failing',
+      timezone: 'UTC',
+      startedChannelId: 'chan-started',
+      enabled: true,
+    });
+
+    const mockDiscord = {
+      sendContestStarted: vi.fn().mockRejectedValue(new Error('Discord 500 Internal Error')),
+    } as unknown as DiscordClient;
+
+    await expect(
+      executeContestStartNotification(contest.id, {
+        repo,
+        discordClient: mockDiscord,
+      })
+    ).rejects.toThrow('Failed to deliver notification to any destination');
+
+    // Verify sent_at was un-claimed so subsequent retry succeeds
+    const notif = await repo.getNotification(contest.id, 'CONTEST_STARTED');
+    expect(notif?.sentAt).toBeNull();
+  });
 });
+

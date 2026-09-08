@@ -78,6 +78,8 @@ export async function executeContestStartNotification(
 
   // 7. Determine destinations and deliver
   let recipientsCount = 0;
+  let hadTargetDestinations = false;
+  let lastError: any = null;
   const servers = await repo.getAllServers();
 
   if (servers.length > 0) {
@@ -95,6 +97,8 @@ export async function executeContestStartNotification(
         continue;
       }
 
+      hadTargetDestinations = true;
+
       try {
         const sent = await discord.sendContestStarted(contest, {
           channelId: server.startedChannelId,
@@ -103,7 +107,8 @@ export async function executeContestStartNotification(
           alertRoleId: server.alertRoleId,
         });
         if (sent) recipientsCount++;
-      } catch (err) {
+      } catch (err: any) {
+        lastError = err;
         logger.error(`Failed to send contest start notification to server ${server.guildId}`, err);
       }
     }
@@ -114,6 +119,7 @@ export async function executeContestStartNotification(
     const isPlatformDefault = DEFAULT_PLATFORMS.includes(contest.platform.toLowerCase());
 
     if ((defaultChannel || defaultWebhook) && isPlatformDefault) {
+      hadTargetDestinations = true;
       try {
         const sent = await discord.sendContestStarted(contest, {
           channelId: defaultChannel,
@@ -121,12 +127,19 @@ export async function executeContestStartNotification(
           timezone: config.defaultTimezone,
         });
         if (sent) recipientsCount++;
-      } catch (err) {
+      } catch (err: any) {
+        lastError = err;
         logger.error('Failed to send contest start notification to default channel/webhook', err);
       }
     } else {
       logger.warn(`No Discord server subscribed or platform ${contest.platform} not enabled by default.`);
     }
+  }
+
+  // If we had destinations configured but all failed due to error, unclaim and throw for retry
+  if (hadTargetDestinations && recipientsCount === 0 && lastError) {
+    await repo.unclaimNotification(contest.id, 'CONTEST_STARTED');
+    throw new Error(`Failed to deliver notification to any destination: ${lastError.message}`);
   }
 
   // 8. Update contest status to RUNNING if it was SCHEDULED

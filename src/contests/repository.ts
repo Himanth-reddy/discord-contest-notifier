@@ -227,6 +227,18 @@ export class ContestRepository {
     return rows.length > 0;
   }
 
+  async unclaimNotification(
+    contestId: string,
+    type: NotificationType = 'CONTEST_STARTED'
+  ): Promise<void> {
+    await this.db.execute(
+      `UPDATE contest_notifications
+       SET sent_at = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE contest_id = $1 AND notification_type = $2`,
+      [contestId, type]
+    );
+  }
+
   // --- Server Methods ---
 
   private mapRowToServer(r: any): ServerConfig {

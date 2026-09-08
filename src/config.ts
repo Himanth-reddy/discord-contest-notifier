@@ -23,6 +23,12 @@ export interface AppConfig {
   };
   defaultTimezone: string;
   defaultPlatforms: string[];
+  qstash: {
+    token?: string;
+    url: string;
+    currentSigningKey?: string;
+    nextSigningKey?: string;
+  };
 }
 
 export const config: AppConfig = {
@@ -49,4 +55,11 @@ export const config: AppConfig = {
   defaultPlatforms: process.env.DEFAULT_PLATFORMS
     ? process.env.DEFAULT_PLATFORMS.split(',').map((p) => p.trim().toLowerCase())
     : ['codechef', 'codeforces', 'leetcode'],
+  qstash: {
+    token: process.env.QSTASH_TOKEN,
+    url: process.env.QSTASH_URL || 'https://qstash.upstash.io',
+    currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY,
+    nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY,
+  },
 };
+

@@ -1,4 +1,5 @@
-import { AsyncWorkloadsClient } from '@netlify/async-workloads';
+import { Client as QStashClient } from '@upstash/qstash';
+import { config } from '../config.js';
 import { ContestRepository } from '../contests/repository.js';
 import { Contest } from '../contests/types.js';
 import { logger } from '../utils/logger.js';
@@ -14,21 +15,56 @@ export class NotificationScheduler {
     if (dispatcher) {
       this.dispatcher = dispatcher;
     } else {
-      try {
-        const siteUrl =
-          process.env.URL ||
-          process.env.DEPLOY_URL ||
-          'https://discordcontestnotifier.netlify.app';
-        const apiKey =
-          process.env.NETLIFY_ASYNC_WORKLOADS_API_KEY ||
-          process.env.NETLIFY_AUTH_TOKEN;
+      const qstashToken = config.qstash.token || process.env.QSTASH_TOKEN;
+      const qstashUrl = config.qstash.url || process.env.QSTASH_URL || 'https://qstash.upstash.io';
+      const siteUrl =
+        process.env.URL ||
+        process.env.DEPLOY_URL ||
+        'https://discordcontestnotifier.netlify.app';
 
-        this.dispatcher = new AsyncWorkloadsClient({
-          baseUrl: siteUrl,
-          apiKey,
-        }) as unknown as WorkloadDispatcher;
-      } catch (err: any) {
-        logger.warn(`Could not initialize AsyncWorkloadsClient: ${err.message}`);
+      if (qstashToken) {
+        try {
+          const qstash = new QStashClient({
+            token: qstashToken,
+            baseUrl: qstashUrl,
+          });
+
+          this.dispatcher = {
+            async send(eventName: string, options?: { data?: any; delayUntil?: number | string }) {
+              const contestId = options?.data?.contestId;
+              const targetUrl = `${siteUrl}/.netlify/functions/notify-manual`;
+
+              let notBefore: number | undefined;
+              if (options?.delayUntil) {
+                const ms =
+                  typeof options.delayUntil === 'number'
+                    ? options.delayUntil
+                    : new Date(options.delayUntil).getTime();
+                notBefore = Math.floor(ms / 1000);
+              }
+
+              const deduplicationId =
+                contestId && notBefore ? `contest-start-${contestId}-${notBefore}` : undefined;
+
+              const res = await qstash.publishJSON({
+                url: targetUrl,
+                body: { contestId },
+                notBefore,
+                deduplicationId,
+              });
+
+              return {
+                sendStatus: 'SCHEDULED',
+                eventId: res.messageId,
+              };
+            },
+          };
+          logger.info(`Initialized QStash dispatcher with target: ${siteUrl}`);
+        } catch (err: any) {
+          logger.warn(`Could not initialize QStashClient: ${err.message}`);
+        }
+      } else {
+        logger.warn('No QSTASH_TOKEN configured. Scheduled notifications will be saved to DB only.');
       }
     }
   }
