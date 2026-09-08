@@ -35,4 +35,5 @@ export interface DiscordDestination {
   channelId?: string | null;
   webhookUrl?: string | null;
   timezone?: string;
+  alertRoleId?: string | null;
 }

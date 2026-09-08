@@ -33,6 +33,10 @@ export interface ServerConfig {
   dailyChannelId?: string | null;
   startedChannelId?: string | null;
   webhookUrl?: string | null;
+  alertRoleId?: string | null;
+  digestHour?: number;
+  lastDailyDigestAt?: Date | null;
+  lastWeeklyDigestAt?: Date | null;
   enabled: boolean;
 }
 

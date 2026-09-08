@@ -24,5 +24,5 @@ const dailyDigestHandler: Handler = async () => {
   }
 };
 
-// Schedule: Daily at 00:00 UTC
-export const handler = schedule('0 0 * * *', dailyDigestHandler);
+// Schedule: Every hour (checks local morning digest hour for each server timezone)
+export const handler = schedule('0 * * * *', dailyDigestHandler);

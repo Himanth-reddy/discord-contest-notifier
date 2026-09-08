@@ -205,4 +205,25 @@ describe('Database & Repository Integration', () => {
     expect(usaco?.name).toBe('USACO');
     expect(usaco?.isDefault).toBe(false);
   });
+
+  it('should store and update alertRoleId and digest timestamps', async () => {
+    await repo.upsertServer({
+      guildId: 'guild-roles',
+      timezone: 'America/New_York',
+      alertRoleId: 'role-coders-123',
+      digestHour: 9,
+      enabled: true,
+    });
+
+    let s = await repo.getServer('guild-roles');
+    expect(s?.alertRoleId).toBe('role-coders-123');
+    expect(s?.digestHour).toBe(9);
+    expect(s?.lastDailyDigestAt).toBeNull();
+
+    const sendTime = new Date('2026-09-08T13:00:00.000Z');
+    await repo.updateServerDigestTimestamp('guild-roles', 'daily', sendTime);
+
+    s = await repo.getServer('guild-roles');
+    expect(s?.lastDailyDigestAt?.toISOString()).toBe(sendTime.toISOString());
+  });
 });

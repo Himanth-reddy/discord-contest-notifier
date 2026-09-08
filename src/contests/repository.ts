@@ -229,23 +229,7 @@ export class ContestRepository {
 
   // --- Server Methods ---
 
-  async getAllServers(): Promise<ServerConfig[]> {
-    const rows = await this.db.query('SELECT * FROM servers WHERE enabled = true');
-    return rows.map((r) => ({
-      guildId: r.guild_id,
-      name: r.name,
-      timezone: r.timezone,
-      weeklyChannelId: r.weekly_channel_id,
-      dailyChannelId: r.daily_channel_id,
-      startedChannelId: r.started_channel_id,
-      webhookUrl: r.webhook_url,
-      enabled: r.enabled === true || r.enabled === 1,
-    }));
-  }
-
-  async getServer(guildId: string): Promise<ServerConfig | null> {
-    const r = await this.db.queryOne('SELECT * FROM servers WHERE guild_id = $1', [guildId]);
-    if (!r) return null;
+  private mapRowToServer(r: any): ServerConfig {
     return {
       guildId: r.guild_id,
       name: r.name,
@@ -254,14 +238,32 @@ export class ContestRepository {
       dailyChannelId: r.daily_channel_id,
       startedChannelId: r.started_channel_id,
       webhookUrl: r.webhook_url,
+      alertRoleId: r.alert_role_id ?? null,
+      digestHour: r.digest_hour !== null && r.digest_hour !== undefined ? Number(r.digest_hour) : 8,
+      lastDailyDigestAt: r.last_daily_digest_at
+        ? (r.last_daily_digest_at instanceof Date ? r.last_daily_digest_at : new Date(r.last_daily_digest_at))
+        : null,
+      lastWeeklyDigestAt: r.last_weekly_digest_at
+        ? (r.last_weekly_digest_at instanceof Date ? r.last_weekly_digest_at : new Date(r.last_weekly_digest_at))
+        : null,
       enabled: r.enabled === true || r.enabled === 1,
     };
   }
 
+  async getAllServers(): Promise<ServerConfig[]> {
+    const rows = await this.db.query('SELECT * FROM servers WHERE enabled = true');
+    return rows.map((r) => this.mapRowToServer(r));
+  }
+
+  async getServer(guildId: string): Promise<ServerConfig | null> {
+    const r = await this.db.queryOne('SELECT * FROM servers WHERE guild_id = $1', [guildId]);
+    return r ? this.mapRowToServer(r) : null;
+  }
+
   async upsertServer(server: ServerConfig): Promise<void> {
     await this.db.execute(
-      `INSERT INTO servers (guild_id, name, timezone, weekly_channel_id, daily_channel_id, started_channel_id, webhook_url, enabled)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO servers (guild_id, name, timezone, weekly_channel_id, daily_channel_id, started_channel_id, webhook_url, alert_role_id, digest_hour, last_daily_digest_at, last_weekly_digest_at, enabled)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (guild_id) DO UPDATE SET
          name = EXCLUDED.name,
          timezone = EXCLUDED.timezone,
@@ -269,6 +271,10 @@ export class ContestRepository {
          daily_channel_id = EXCLUDED.daily_channel_id,
          started_channel_id = EXCLUDED.started_channel_id,
          webhook_url = EXCLUDED.webhook_url,
+         alert_role_id = EXCLUDED.alert_role_id,
+         digest_hour = EXCLUDED.digest_hour,
+         last_daily_digest_at = COALESCE(EXCLUDED.last_daily_digest_at, servers.last_daily_digest_at),
+         last_weekly_digest_at = COALESCE(EXCLUDED.last_weekly_digest_at, servers.last_weekly_digest_at),
          enabled = EXCLUDED.enabled`,
       [
         server.guildId,
@@ -278,8 +284,24 @@ export class ContestRepository {
         server.dailyChannelId ?? null,
         server.startedChannelId ?? null,
         server.webhookUrl ?? null,
+        server.alertRoleId ?? null,
+        server.digestHour ?? 8,
+        server.lastDailyDigestAt ?? null,
+        server.lastWeeklyDigestAt ?? null,
         server.enabled,
       ]
+    );
+  }
+
+  async updateServerDigestTimestamp(
+    guildId: string,
+    type: 'daily' | 'weekly',
+    timestamp: Date = new Date()
+  ): Promise<void> {
+    const column = type === 'daily' ? 'last_daily_digest_at' : 'last_weekly_digest_at';
+    await this.db.execute(
+      `UPDATE servers SET ${column} = $1 WHERE guild_id = $2`,
+      [timestamp, guildId]
     );
   }
 

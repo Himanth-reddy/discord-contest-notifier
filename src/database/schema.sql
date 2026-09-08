@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS servers (
     daily_channel_id VARCHAR(64),
     started_channel_id VARCHAR(64),
     webhook_url TEXT,
+    alert_role_id VARCHAR(64),
+    digest_hour INT NOT NULL DEFAULT 8,
+    last_daily_digest_at TIMESTAMPTZ,
+    last_weekly_digest_at TIMESTAMPTZ,
     enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 

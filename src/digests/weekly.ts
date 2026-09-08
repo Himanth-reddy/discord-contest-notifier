@@ -3,14 +3,17 @@ import { DEFAULT_PLATFORMS } from '../contests/types.js';
 import { ContestRepository } from '../contests/repository.js';
 import { DiscordClient } from '../discord/client.js';
 import { logger } from '../utils/logger.js';
-import { getServerWeekBounds } from '../utils/timezone.js';
-import { DigestExecutionResult } from './daily.js';
+import { getServerWeekBounds, isServerWeeklyDigestDue } from '../utils/timezone.js';
+import { DailyDigestResult } from './daily.js';
 
-export async function executeWeeklyDigest(options?: {
+export interface WeeklyDigestOptions {
   repo?: ContestRepository;
   discord?: DiscordClient;
   now?: Date;
-}): Promise<DigestExecutionResult> {
+  force?: boolean;
+}
+
+export async function executeWeeklyDigest(options?: WeeklyDigestOptions): Promise<DailyDigestResult> {
   const repo = options?.repo || new ContestRepository();
   const discord = options?.discord || new DiscordClient();
   const now = options?.now || new Date();
@@ -24,9 +27,20 @@ export async function executeWeeklyDigest(options?: {
       if (!server.weeklyChannelId && !server.webhookUrl) {
         continue;
       }
-      serversProcessed++;
 
       const tz = server.timezone || config.defaultTimezone;
+      const targetHour = server.digestHour ?? 8;
+
+      if (!options?.force) {
+        const isDue = isServerWeeklyDigestDue(tz, server.lastWeeklyDigestAt, targetHour, 1, now);
+        if (!isDue) {
+          logger.debug(`Weekly digest not due for server ${server.guildId} (tz: ${tz})`);
+          continue;
+        }
+      }
+
+      serversProcessed++;
+
       const { startUtc, endUtc } = getServerWeekBounds(now, tz);
 
       // Check server platform preferences (defaults to Codeforces, CodeChef, LeetCode)
@@ -38,8 +52,12 @@ export async function executeWeeklyDigest(options?: {
           channelId: server.weeklyChannelId,
           webhookUrl: server.webhookUrl,
           timezone: tz,
+          alertRoleId: server.alertRoleId,
         });
-        if (sent) digestsSent++;
+        if (sent) {
+          digestsSent++;
+          await repo.updateServerDigestTimestamp(server.guildId, 'weekly', now);
+        }
       } catch (err) {
         logger.error(`Failed to send weekly digest to server ${server.guildId}`, err);
       }

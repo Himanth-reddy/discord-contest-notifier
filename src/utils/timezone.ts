@@ -101,3 +101,103 @@ function parseOffsetToMinutes(offsetStr: string): number {
   const minutes = match[3] ? parseInt(match[3], 10) : 0;
   return sign * (hours * 60 + minutes);
 }
+
+/**
+ * Gets the current hour (0-23) in the specified timezone.
+ */
+export function getLocalHour(date: Date, timezone: string): number {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    return parseInt(formatter.format(date), 10);
+  } catch {
+    return date.getUTCHours();
+  }
+}
+
+/**
+ * Gets the current day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday) in the specified timezone.
+ */
+export function getLocalDayOfWeek(date: Date, timezone: string): number {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      weekday: 'short',
+    });
+    const dayStr = formatter.format(date);
+    const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    return map[dayStr] ?? date.getUTCDay();
+  } catch {
+    return date.getUTCDay();
+  }
+}
+
+/**
+ * Checks if two dates fall on the same calendar day in the given timezone.
+ */
+export function isSameLocalDay(dateA: Date, dateB: Date, timezone: string): boolean {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    return formatter.format(dateA) === formatter.format(dateB);
+  } catch {
+    return dateA.toISOString().slice(0, 10) === dateB.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Determines whether a daily digest is due for a server in its timezone.
+ * Returns true if the current local hour matches targetHour (default 8)
+ * and no digest has been sent yet on this local calendar day.
+ */
+export function isServerDailyDigestDue(
+  timezone: string,
+  lastSentAt: Date | null | undefined,
+  targetHour: number = 8,
+  now: Date = new Date()
+): boolean {
+  const localHour = getLocalHour(now, timezone);
+  if (localHour !== targetHour) {
+    return false;
+  }
+  if (lastSentAt && isSameLocalDay(lastSentAt, now, timezone)) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Determines whether a weekly digest is due for a server in its timezone.
+ * Returns true if today is Monday (1), the current local hour matches targetHour (default 8),
+ * and no weekly digest has been sent yet within the last 5 days.
+ */
+export function isServerWeeklyDigestDue(
+  timezone: string,
+  lastSentAt: Date | null | undefined,
+  targetHour: number = 8,
+  targetDayOfWeek: number = 1, // 1 = Monday
+  now: Date = new Date()
+): boolean {
+  const localDayOfWeek = getLocalDayOfWeek(now, timezone);
+  if (localDayOfWeek !== targetDayOfWeek) {
+    return false;
+  }
+  const localHour = getLocalHour(now, timezone);
+  if (localHour !== targetHour) {
+    return false;
+  }
+  if (lastSentAt) {
+    const diffMs = now.getTime() - lastSentAt.getTime();
+    if (diffMs < 5 * 24 * 60 * 60 * 1000) {
+      return false;
+    }
+  }
+  return true;
+}

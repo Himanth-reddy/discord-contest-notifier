@@ -5,7 +5,7 @@ import { logger } from '../../src/utils/logger.js';
 export const handler: Handler = async () => {
   logger.info('Manual trigger: Weekly Digest');
   try {
-    const result = await executeWeeklyDigest();
+    const result = await executeWeeklyDigest({ force: true });
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },

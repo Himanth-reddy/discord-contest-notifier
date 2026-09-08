@@ -3,20 +3,23 @@ import { DEFAULT_PLATFORMS } from '../contests/types.js';
 import { ContestRepository } from '../contests/repository.js';
 import { DiscordClient } from '../discord/client.js';
 import { NotificationScheduler } from '../notifications/scheduler.js';
+import { getServerDayBounds, isServerDailyDigestDue } from '../utils/timezone.js';
 import { logger } from '../utils/logger.js';
-import { getServerDayBounds } from '../utils/timezone.js';
 
-export interface DigestExecutionResult {
-  serversProcessed: number;
-  digestsSent: number;
-}
-
-export async function executeDailyDigest(options?: {
+export interface DailyDigestOptions {
   repo?: ContestRepository;
   discord?: DiscordClient;
   scheduler?: NotificationScheduler;
   now?: Date;
-}): Promise<DigestExecutionResult> {
+  force?: boolean;
+}
+
+export interface DailyDigestResult {
+  serversProcessed: number;
+  digestsSent: number;
+}
+
+export async function executeDailyDigest(options?: DailyDigestOptions): Promise<DailyDigestResult> {
   const repo = options?.repo || new ContestRepository();
   const discord = options?.discord || new DiscordClient();
   const scheduler = options?.scheduler || new NotificationScheduler(repo);
@@ -31,9 +34,21 @@ export async function executeDailyDigest(options?: {
       if (!server.dailyChannelId && !server.webhookUrl) {
         continue;
       }
-      serversProcessed++;
 
       const tz = server.timezone || config.defaultTimezone;
+      const targetHour = server.digestHour ?? 8;
+
+      // In scheduled cron runs, only send if it's the server's morning digest hour and not sent yet today
+      if (!options?.force) {
+        const isDue = isServerDailyDigestDue(tz, server.lastDailyDigestAt, targetHour, now);
+        if (!isDue) {
+          logger.debug(`Daily digest not due for server ${server.guildId} (tz: ${tz})`);
+          continue;
+        }
+      }
+
+      serversProcessed++;
+
       const { startUtc, endUtc } = getServerDayBounds(now, tz);
 
       // Check server platform preferences (defaults to Codeforces, CodeChef, LeetCode)
@@ -52,8 +67,12 @@ export async function executeDailyDigest(options?: {
           channelId: server.dailyChannelId,
           webhookUrl: server.webhookUrl,
           timezone: tz,
+          alertRoleId: server.alertRoleId,
         });
-        if (sent) digestsSent++;
+        if (sent) {
+          digestsSent++;
+          await repo.updateServerDigestTimestamp(server.guildId, 'daily', now);
+        }
       } catch (err) {
         logger.error(`Failed to send daily digest to server ${server.guildId}`, err);
       }

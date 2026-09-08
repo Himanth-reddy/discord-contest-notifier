@@ -72,6 +72,7 @@ describe('Daily & Weekly Digests', () => {
       discord: mockDiscord,
       scheduler,
       now: today,
+      force: true,
     });
 
     expect(result.digestsSent).toBe(1);
@@ -88,7 +89,7 @@ describe('Daily & Weekly Digests', () => {
   });
 
   it('should send weekly digest for contests occurring in next 7 days', async () => {
-    const refDate = new Date('2026-09-10T00:00:00.000Z');
+    const refDate = new Date('2026-09-08T08:00:00.000Z');
 
     // In 2 days
     await repo.upsertContest({
@@ -96,8 +97,8 @@ describe('Daily & Weekly Digests', () => {
       platform: 'codeforces',
       name: 'CF In 2 Days',
       url: 'https://codeforces.com/2days',
-      startTime: new Date('2026-09-12T14:00:00.000Z'),
-      endTime: new Date('2026-09-12T16:00:00.000Z'),
+      startTime: new Date('2026-09-10T14:00:00.000Z'),
+      endTime: new Date('2026-09-10T16:00:00.000Z'),
       duration: 7200,
       status: 'SCHEDULED',
     });
@@ -108,8 +109,8 @@ describe('Daily & Weekly Digests', () => {
       platform: 'leetcode',
       name: 'LC In 5 Days',
       url: 'https://leetcode.com/5days',
-      startTime: new Date('2026-09-15T02:30:00.000Z'),
-      endTime: new Date('2026-09-15T04:00:00.000Z'),
+      startTime: new Date('2026-09-13T02:30:00.000Z'),
+      endTime: new Date('2026-09-13T04:00:00.000Z'),
       duration: 5400,
       status: 'SCHEDULED',
     });
@@ -140,6 +141,7 @@ describe('Daily & Weekly Digests', () => {
       repo,
       discord: mockDiscord,
       now: refDate,
+      force: true,
     });
 
     expect(result.digestsSent).toBe(1);
@@ -151,5 +153,63 @@ describe('Daily & Weekly Digests', () => {
     expect(names).toContain('CF In 2 Days');
     expect(names).toContain('LC In 5 Days');
     expect(names).not.toContain('CodeChef In 10 Days');
+  });
+
+  it('should deliver daily digest at local morning hour and include alertRoleId', async () => {
+    await repo.upsertServer({
+      guildId: 'server-india',
+      timezone: 'Asia/Kolkata',
+      dailyChannelId: 'chan-india-daily',
+      alertRoleId: 'role-contestants',
+      digestHour: 8,
+      enabled: true,
+    });
+
+    const mockSendDaily = vi.fn().mockResolvedValue(true);
+    const mockDiscord = { sendDailyDigest: mockSendDaily } as unknown as DiscordClient;
+    const mockDispatcher: WorkloadDispatcher = { send: vi.fn().mockResolvedValue({ sendStatus: 'succeeded' }) };
+    const scheduler = new NotificationScheduler(repo, mockDispatcher);
+
+    // 08:00 AM IST is 02:30 AM UTC
+    const morningInIndia = new Date('2026-09-10T02:30:00.000Z');
+
+    // 1. Should send when it is 8:00 AM in India
+    const result1 = await executeDailyDigest({
+      repo,
+      discord: mockDiscord,
+      scheduler,
+      now: morningInIndia,
+      force: false,
+    });
+    expect(result1.digestsSent).toBe(1);
+    expect(mockSendDaily).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        channelId: 'chan-india-daily',
+        alertRoleId: 'role-contestants',
+        timezone: 'Asia/Kolkata',
+      })
+    );
+
+    // 2. Immediate second call on same day should be skipped (deduplicated)
+    const resultDuplicate = await executeDailyDigest({
+      repo,
+      discord: mockDiscord,
+      scheduler,
+      now: morningInIndia,
+      force: false,
+    });
+    expect(resultDuplicate.digestsSent).toBe(0);
+
+    // 3. At 2:00 PM IST (08:30 UTC), should not send
+    const afternoonInIndia = new Date('2026-09-11T08:30:00.000Z');
+    const resultAfternoon = await executeDailyDigest({
+      repo,
+      discord: mockDiscord,
+      scheduler,
+      now: afternoonInIndia,
+      force: false,
+    });
+    expect(resultAfternoon.digestsSent).toBe(0);
   });
 });

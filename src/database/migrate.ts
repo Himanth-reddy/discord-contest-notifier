@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS servers (
     daily_channel_id VARCHAR(64),
     started_channel_id VARCHAR(64),
     webhook_url TEXT,
+    alert_role_id VARCHAR(64),
+    digest_hour INT NOT NULL DEFAULT 8,
+    last_daily_digest_at TIMESTAMPTZ,
+    last_weekly_digest_at TIMESTAMPTZ,
     enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
@@ -91,6 +95,22 @@ export async function runMigrations(adapter?: DatabaseAdapter): Promise<void> {
 
   for (const statement of statements) {
     await db.execute(statement);
+  }
+
+  // Run column additions for existing installations (non-blocking if already present)
+  const columnMigrations = [
+    'ALTER TABLE servers ADD COLUMN alert_role_id VARCHAR(64)',
+    'ALTER TABLE servers ADD COLUMN digest_hour INT DEFAULT 8',
+    'ALTER TABLE servers ADD COLUMN last_daily_digest_at TIMESTAMPTZ',
+    'ALTER TABLE servers ADD COLUMN last_weekly_digest_at TIMESTAMPTZ',
+  ];
+
+  for (const colMigration of columnMigrations) {
+    try {
+      await db.execute(colMigration);
+    } catch {
+      // Ignored if column already exists
+    }
   }
 
   logger.info('Database migrations completed successfully.');

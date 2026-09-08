@@ -108,6 +108,24 @@ export const SLASH_COMMANDS = [
           },
         ],
       },
+      {
+        name: 'role',
+        description: 'Set or clear the role to ping for contest alerts (@Contestants)',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'role',
+            description: 'The role to mention (leave empty to clear role ping)',
+            type: 8, // ROLE
+            required: false,
+          },
+        ],
+      },
+      {
+        name: 'test',
+        description: 'Send test notifications to your configured channels to verify permissions',
+        type: 1, // SUB_COMMAND
+      },
     ],
   },
 ];

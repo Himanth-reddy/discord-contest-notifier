@@ -100,6 +100,7 @@ export async function executeContestStartNotification(
           channelId: server.startedChannelId,
           webhookUrl: server.webhookUrl,
           timezone: server.timezone,
+          alertRoleId: server.alertRoleId,
         });
         if (sent) recipientsCount++;
       } catch (err) {

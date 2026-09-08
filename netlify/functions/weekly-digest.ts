@@ -24,5 +24,5 @@ const weeklyDigestHandler: Handler = async () => {
   }
 };
 
-// Schedule: Weekly on Monday at 00:00 UTC
-export const handler = schedule('0 0 * * 1', weeklyDigestHandler);
+// Schedule: Every hour (checks local Monday morning digest hour for each server timezone)
+export const handler = schedule('0 * * * *', weeklyDigestHandler);
