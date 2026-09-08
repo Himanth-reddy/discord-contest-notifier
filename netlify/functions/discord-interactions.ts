@@ -21,23 +21,30 @@ export const handler: Handler = async (event) => {
 
   const signature =
     event.headers['x-signature-ed25519'] ||
-    event.headers['X-Signature-Ed25519'];
+    event.headers['X-Signature-Ed25519'] ||
+    '';
   const timestamp =
     event.headers['x-signature-timestamp'] ||
-    event.headers['X-Signature-Timestamp'];
-  const rawBody = event.body || '';
+    event.headers['X-Signature-Timestamp'] ||
+    '';
 
-  // 1. Verify Discord cryptographic signature
+  const rawBody = event.isBase64Encoded
+    ? Buffer.from(event.body || '', 'base64').toString('utf-8')
+    : (event.body || '');
+
+  // 1. Check Public Key
   const publicKey = config.discord.publicKey;
   if (!publicKey) {
     logger.warn('DISCORD_PUBLIC_KEY is not set in environment variables');
     return {
       statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ error: 'Server configuration error: DISCORD_PUBLIC_KEY missing' }),
     };
   }
 
-  const isValidRequest = verifyKey(rawBody, signature || '', timestamp || '', publicKey);
+  // 2. Verify Discord cryptographic signature
+  const isValidRequest = verifyKey(rawBody, signature, timestamp, publicKey);
   if (!isValidRequest) {
     logger.warn('Received invalid Discord interaction signature');
     return { statusCode: 401, body: 'Invalid request signature' };
@@ -45,7 +52,7 @@ export const handler: Handler = async (event) => {
 
   const interaction = JSON.parse(rawBody);
 
-  // 2. Respond to Discord PING (required for endpoint validation)
+  // 3. Respond to Discord PING (required for endpoint validation)
   if (interaction.type === InteractionType.PING) {
     return {
       statusCode: 200,
@@ -54,7 +61,7 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 3. Handle Application Slash Commands
+  // 4. Handle Application Slash Commands
   if (interaction.type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interaction.data;
     const guildId = interaction.guild_id || 'default';
@@ -235,7 +242,6 @@ export const handler: Handler = async (event) => {
       if (subCommand === 'timezone') {
         const newTz = subOptions.find((o: any) => o.name === 'timezone')?.value;
         try {
-          // Verify valid IANA timezone
           Intl.DateTimeFormat(undefined, { timeZone: newTz });
           await repo.upsertServer({ ...currentServer, timezone: newTz });
 
