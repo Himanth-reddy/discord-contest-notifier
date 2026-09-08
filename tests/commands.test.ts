@@ -16,7 +16,7 @@ describe('Discord Slash Commands', () => {
 
     const configCmd = SLASH_COMMANDS.find((c) => c.name === 'config');
     expect(configCmd?.default_member_permissions).toBeDefined();
-    expect(configCmd?.options?.length).toBe(4); // view, timezone, channels, platform
+    expect(configCmd?.options?.length).toBe(5); // view, platforms, platform, timezone, channels
   });
 
   it('should register slash commands via Discord API', async () => {

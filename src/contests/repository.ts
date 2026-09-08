@@ -2,6 +2,8 @@ import crypto from 'crypto';
 import { DatabaseAdapter } from '../database/adapter.js';
 import { getDatabaseAdapter } from '../database/connection.js';
 import {
+  ALL_PLATFORMS,
+  DEFAULT_PLATFORMS,
   Contest,
   ContestNotification,
   ContestStatus,
@@ -279,11 +281,26 @@ export class ContestRepository {
     );
   }
 
+  /**
+   * Returns all enabled platforms for a given server.
+   * If the server has no customized platforms configured, returns DEFAULT_PLATFORMS (CodeChef, Codeforces, LeetCode).
+   */
   async getServerEnabledPlatforms(guildId: string): Promise<string[]> {
     const rows = await this.db.query(
       'SELECT platform FROM server_platforms WHERE guild_id = $1 AND enabled = true',
       [guildId]
     );
+    if (rows.length === 0) {
+      const anyRows = await this.db.query(
+        'SELECT platform FROM server_platforms WHERE guild_id = $1',
+        [guildId]
+      );
+      // If server never customized platform settings, use defaults
+      if (anyRows.length === 0) {
+        return [...DEFAULT_PLATFORMS];
+      }
+      return [];
+    }
     return rows.map((r) => r.platform.toLowerCase());
   }
 
@@ -295,5 +312,22 @@ export class ContestRepository {
          enabled = EXCLUDED.enabled`,
       [guildId, platform.toLowerCase(), enabled]
     );
+  }
+
+  /**
+   * Sets all platforms for a server at once (e.g. from multi-select dropdown in Discord).
+   */
+  async setServerPlatforms(guildId: string, selectedPlatforms: string[]): Promise<void> {
+    const selectedNormalized = selectedPlatforms.map((p) => p.toLowerCase());
+    await this.db.transaction(async (tx) => {
+      await tx.execute('DELETE FROM server_platforms WHERE guild_id = $1', [guildId]);
+      for (const platform of ALL_PLATFORMS) {
+        const isEnabled = selectedNormalized.includes(platform.id);
+        await tx.execute(
+          'INSERT INTO server_platforms (guild_id, platform, enabled) VALUES ($1, $2, $3)',
+          [guildId, platform.id, isEnabled]
+        );
+      }
+    });
   }
 }

@@ -5,6 +5,7 @@ import {
   verifyKey,
 } from 'discord-interactions';
 import { config } from '../../src/config.js';
+import { ALL_PLATFORMS } from '../../src/contests/types.js';
 import { ContestRepository } from '../../src/contests/repository.js';
 import { ContestService } from '../../src/contests/service.js';
 import {
@@ -32,7 +33,7 @@ export const handler: Handler = async (event) => {
     ? Buffer.from(event.body || '', 'base64').toString('utf-8')
     : (event.body || '');
 
-  // 1. Check Public Key
+  // 1. Verify public key
   const publicKey = config.discord.publicKey;
   if (!publicKey) {
     logger.warn('DISCORD_PUBLIC_KEY is not set in environment variables');
@@ -43,7 +44,7 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 2. Cryptographically verify signature using ED25519 (must await verifyKey)
+  // 2. Cryptographically verify signature using ED25519
   const isValidRequest = await verifyKey(rawBody, signature, timestamp, publicKey);
   if (!isValidRequest) {
     logger.warn('Received invalid Discord interaction signature');
@@ -57,7 +58,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 400, body: 'Invalid JSON payload' };
   }
 
-  // 3. Respond to Discord PING (required for endpoint validation in Developer Portal)
+  // 3. Respond to Discord PING (required for Developer Portal verification)
   if (interaction.type === InteractionType.PING) {
     return {
       statusCode: 200,
@@ -66,24 +67,52 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 4. Handle Application Slash Commands
+  const repo = new ContestRepository();
+  const guildId = interaction.guild_id || 'default';
+  const server = await repo.getServer(guildId);
+  const timezone = server?.timezone || config.defaultTimezone;
+  const now = new Date();
+
+  // 4. Handle Interactive Message Components (e.g. Multi-Select Menu for platforms)
+  if (interaction.type === InteractionType.MESSAGE_COMPONENT) {
+    const customId = interaction.data?.custom_id;
+
+    if (customId === 'select_platforms') {
+      const selectedPlatforms: string[] = interaction.data?.values || [];
+      await repo.setServerPlatforms(guildId, selectedPlatforms);
+
+      const displayNames = ALL_PLATFORMS
+        .filter((p) => selectedPlatforms.includes(p.id))
+        .map((p) => `• **${p.name}**`);
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: InteractionResponseType.UPDATE_MESSAGE,
+          data: {
+            content: `✅ **Successfully updated platform subscriptions!**\n\nThis server will now receive notifications and digests for:\n${
+              displayNames.length > 0 ? displayNames.join('\n') : '*(None selected)*'
+            }\n\n*You can change this anytime using \`/config platforms\`.*`,
+            embeds: [],
+            components: [],
+          },
+        }),
+      };
+    }
+  }
+
+  // 5. Handle Application Slash Commands
   if (interaction.type === InteractionType.APPLICATION_COMMAND) {
     const { name, options } = interaction.data;
-    const guildId = interaction.guild_id || 'default';
-    const repo = new ContestRepository();
-    const server = await repo.getServer(guildId);
-    const timezone = server?.timezone || config.defaultTimezone;
-    const now = new Date();
-
     logger.info(`Received slash command: /${name} from guild: ${guildId}`);
 
     // Command: /today
     if (name === 'today') {
       const { startUtc, endUtc } = getServerDayBounds(now, timezone);
       const enabledPlatforms = await repo.getServerEnabledPlatforms(guildId);
-      const platformsFilter = enabledPlatforms.length > 0 ? enabledPlatforms : undefined;
 
-      const contests = await repo.findContestsInWindow(startUtc, endUtc, platformsFilter);
+      const contests = await repo.findContestsInWindow(startUtc, endUtc, enabledPlatforms);
       const payload = formatDailyDigestMessage(contests, timezone);
 
       return {
@@ -105,8 +134,7 @@ export const handler: Handler = async (event) => {
       if (platformOption) {
         platformsFilter = [platformOption.toLowerCase()];
       } else {
-        const enabled = await repo.getServerEnabledPlatforms(guildId);
-        if (enabled.length > 0) platformsFilter = enabled;
+        platformsFilter = await repo.getServerEnabledPlatforms(guildId);
       }
 
       const contests = await repo.findContestsInWindow(startUtc, endUtc, platformsFilter);
@@ -134,7 +162,7 @@ export const handler: Handler = async (event) => {
               {
                 title: '🏆 Discord Contest Notifier Help',
                 description:
-                  'A serverless bot that automatically notifies your server about competitive programming contests from Codeforces, LeetCode, AtCoder, CodeChef, and more.',
+                  'A serverless bot that automatically notifies your server about competitive programming contests from Codeforces, LeetCode, CodeChef, and more.',
                 color: 0x5865f2,
                 fields: [
                   {
@@ -145,7 +173,7 @@ export const handler: Handler = async (event) => {
                   {
                     name: '🛡️ Admin Commands',
                     value:
-                      '`/sync` — Force an immediate contest synchronization from CLIST\n`/config view` — View current server configuration\n`/config timezone` — Set server timezone (e.g. `Asia/Kolkata`)\n`/config channels` — Configure notification channels\n`/config platform` — Enable or disable platform alerts',
+                      '`/sync` — Force an immediate contest synchronization from CLIST\n`/config view` — View current server configuration\n`/config platforms` — Choose which platforms to track via interactive menu\n`/config platform` — Toggle a specific platform on/off\n`/config timezone` — Set server timezone (e.g. `Asia/Kolkata`)\n`/config channels` — Configure notification channels',
                   },
                   {
                     name: '⚙️ Current Server Timezone',
@@ -207,10 +235,12 @@ export const handler: Handler = async (event) => {
 
       if (subCommand === 'view') {
         const platforms = await repo.getServerEnabledPlatforms(guildId);
-        const platformText =
-          platforms.length > 0
-            ? platforms.map((p) => `• ${p.toUpperCase()}`).join('\n')
-            : '• All platforms enabled (default)';
+        const platformText = platforms
+          .map((p) => {
+            const info = ALL_PLATFORMS.find((item) => item.id === p);
+            return `• **${info ? info.name : p.toUpperCase()}**`;
+          })
+          .join('\n');
 
         return {
           statusCode: 200,
@@ -235,10 +265,75 @@ export const handler: Handler = async (event) => {
                         currentServer.weeklyChannelId ? `<#${currentServer.weeklyChannelId}>` : 'Not configured'
                       }`,
                     },
-                    { name: 'Subscribed Platforms', value: platformText },
+                    {
+                      name: 'Subscribed Platforms (Default: Codeforces, CodeChef, LeetCode)',
+                      value: platformText || '*(None)*',
+                    },
                   ],
                 },
               ],
+            },
+          }),
+        };
+      }
+
+      // Subcommand: /config platforms (Interactive Dropdown Menu)
+      if (subCommand === 'platforms') {
+        const currentlyEnabled = await repo.getServerEnabledPlatforms(guildId);
+
+        const selectOptions = ALL_PLATFORMS.map((p) => ({
+          label: p.name,
+          value: p.id,
+          description: p.description.slice(0, 50),
+          default: currentlyEnabled.includes(p.id),
+        }));
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: '🎯 **Select Contest Platforms to Track**\nChoose all the platforms you want to receive alerts and digests for on this server:',
+              components: [
+                {
+                  type: 1, // Action Row
+                  components: [
+                    {
+                      type: 3, // String Select Menu
+                      custom_id: 'select_platforms',
+                      placeholder: 'Select platforms...',
+                      min_values: 1,
+                      max_values: ALL_PLATFORMS.length,
+                      options: selectOptions,
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+        };
+      }
+
+      // Subcommand: /config platform name:<choice> enabled:<boolean>
+      if (subCommand === 'platform') {
+        const platformName = subOptions.find((o: any) => o.name === 'name')?.value;
+        const enabled = subOptions.find((o: any) => o.name === 'enabled')?.value;
+
+        await repo.setServerPlatform(guildId, platformName, enabled);
+
+        const info = ALL_PLATFORMS.find((p) => p.id === platformName.toLowerCase());
+        const prettyName = info ? info.name : platformName.toUpperCase();
+
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+            data: {
+              content: `✅ Platform **${prettyName}** is now **${
+                enabled ? 'ENABLED' : 'DISABLED'
+              }** for this server.`,
             },
           }),
         };
@@ -298,26 +393,6 @@ export const handler: Handler = async (event) => {
               }\n• Weekly Digest: ${
                 updated.weeklyChannelId ? `<#${updated.weeklyChannelId}>` : 'unchanged'
               }`,
-            },
-          }),
-        };
-      }
-
-      if (subCommand === 'platform') {
-        const platformName = subOptions.find((o: any) => o.name === 'name')?.value;
-        const enabled = subOptions.find((o: any) => o.name === 'enabled')?.value;
-
-        await repo.setServerPlatform(guildId, platformName, enabled);
-
-        return {
-          statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              content: `✅ Platform **${platformName.toUpperCase()}** is now **${
-                enabled ? 'ENABLED' : 'DISABLED'
-              }** for this server.`,
             },
           }),
         };

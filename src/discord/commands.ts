@@ -1,5 +1,11 @@
 import { config } from '../config.js';
+import { ALL_PLATFORMS } from '../contests/types.js';
 import { logger } from '../utils/logger.js';
+
+const platformChoices = ALL_PLATFORMS.map((p) => ({
+  name: p.name,
+  value: p.id,
+}));
 
 export const SLASH_COMMANDS = [
   {
@@ -15,12 +21,7 @@ export const SLASH_COMMANDS = [
         description: 'Filter by platform',
         type: 3, // STRING
         required: false,
-        choices: [
-          { name: 'Codeforces', value: 'codeforces' },
-          { name: 'LeetCode', value: 'leetcode' },
-          { name: 'AtCoder', value: 'atcoder' },
-          { name: 'CodeChef', value: 'codechef' },
-        ],
+        choices: platformChoices,
       },
     ],
   },
@@ -40,8 +41,33 @@ export const SLASH_COMMANDS = [
     options: [
       {
         name: 'view',
-        description: 'View current server configuration',
+        description: 'View current server configuration and enabled platforms',
         type: 1, // SUB_COMMAND
+      },
+      {
+        name: 'platforms',
+        description: 'Open an interactive menu to choose which contest platforms to track',
+        type: 1, // SUB_COMMAND
+      },
+      {
+        name: 'platform',
+        description: 'Enable or disable alerts for a specific platform',
+        type: 1, // SUB_COMMAND
+        options: [
+          {
+            name: 'name',
+            description: 'Platform name',
+            type: 3, // STRING
+            required: true,
+            choices: platformChoices,
+          },
+          {
+            name: 'enabled',
+            description: 'Enable or disable this platform',
+            type: 5, // BOOLEAN
+            required: true,
+          },
+        ],
       },
       {
         name: 'timezone',
@@ -78,31 +104,6 @@ export const SLASH_COMMANDS = [
             description: 'Channel for weekly contest digests',
             type: 7, // CHANNEL
             required: false,
-          },
-        ],
-      },
-      {
-        name: 'platform',
-        description: 'Enable or disable alerts for a specific platform',
-        type: 1, // SUB_COMMAND
-        options: [
-          {
-            name: 'name',
-            description: 'Platform name',
-            type: 3, // STRING
-            required: true,
-            choices: [
-              { name: 'Codeforces', value: 'codeforces' },
-              { name: 'LeetCode', value: 'leetcode' },
-              { name: 'AtCoder', value: 'atcoder' },
-              { name: 'CodeChef', value: 'codechef' },
-            ],
-          },
-          {
-            name: 'enabled',
-            description: 'Enable or disable this platform',
-            type: 5, // BOOLEAN
-            required: true,
           },
         ],
       },

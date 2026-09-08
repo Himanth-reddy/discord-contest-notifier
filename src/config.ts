@@ -22,6 +22,7 @@ export interface AppConfig {
     defaultWebhookUrl?: string;
   };
   defaultTimezone: string;
+  defaultPlatforms: string[];
 }
 
 export const config: AppConfig = {
@@ -45,4 +46,7 @@ export const config: AppConfig = {
     defaultWebhookUrl: process.env.DEFAULT_WEBHOOK_URL,
   },
   defaultTimezone: process.env.DEFAULT_TIMEZONE || 'UTC',
+  defaultPlatforms: process.env.DEFAULT_PLATFORMS
+    ? process.env.DEFAULT_PLATFORMS.split(',').map((p) => p.trim().toLowerCase())
+    : ['codechef', 'codeforces', 'leetcode'],
 };

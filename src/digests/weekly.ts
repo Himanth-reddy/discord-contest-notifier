@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { DEFAULT_PLATFORMS } from '../contests/types.js';
 import { ContestRepository } from '../contests/repository.js';
 import { DiscordClient } from '../discord/client.js';
 import { logger } from '../utils/logger.js';
@@ -28,10 +29,9 @@ export async function executeWeeklyDigest(options?: {
       const tz = server.timezone || config.defaultTimezone;
       const { startUtc, endUtc } = getServerWeekBounds(now, tz);
 
+      // Check server platform preferences (defaults to Codeforces, CodeChef, LeetCode)
       const enabledPlatforms = await repo.getServerEnabledPlatforms(server.guildId);
-      const platformsFilter = enabledPlatforms.length > 0 ? enabledPlatforms : undefined;
-
-      const contests = await repo.findContestsInWindow(startUtc, endUtc, platformsFilter);
+      const contests = await repo.findContestsInWindow(startUtc, endUtc, enabledPlatforms);
 
       try {
         const sent = await discord.sendWeeklyDigest(contests, {
@@ -53,7 +53,7 @@ export async function executeWeeklyDigest(options?: {
       serversProcessed = 1;
       const tz = config.defaultTimezone;
       const { startUtc, endUtc } = getServerWeekBounds(now, tz);
-      const contests = await repo.findContestsInWindow(startUtc, endUtc);
+      const contests = await repo.findContestsInWindow(startUtc, endUtc, DEFAULT_PLATFORMS);
 
       try {
         const sent = await discord.sendWeeklyDigest(contests, {

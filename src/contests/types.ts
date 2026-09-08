@@ -49,3 +49,22 @@ export interface UpsertContestResult {
   changeType: UpsertChangeType;
   oldStartTime?: Date;
 }
+
+export interface PlatformInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export const ALL_PLATFORMS: PlatformInfo[] = [
+  { id: 'codeforces', name: 'Codeforces', description: 'Div 1/2/3/4 & Educational Rounds' },
+  { id: 'codechef', name: 'CodeChef', description: 'Starters, Cook-Offs, Lunchtimes' },
+  { id: 'leetcode', name: 'LeetCode', description: 'Weekly & Biweekly Contests' },
+  { id: 'atcoder', name: 'AtCoder', description: 'Beginner (ABC), Regular (ARC), Grand (AGC)' },
+  { id: 'hackerrank', name: 'HackerRank', description: 'HackerRank Contests' },
+  { id: 'topcoder', name: 'TopCoder', description: 'Single Round Matches (SRM)' },
+  { id: 'kaggle', name: 'Kaggle', description: 'ML & Data Science Competitions' },
+  { id: 'geeksforgeeks', name: 'GeeksforGeeks', description: 'Weekly Contests & Bi-Wizard' },
+];
+
+export const DEFAULT_PLATFORMS: string[] = ['codeforces', 'codechef', 'leetcode'];

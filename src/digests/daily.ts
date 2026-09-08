@@ -1,6 +1,6 @@
 import { config } from '../config.js';
+import { DEFAULT_PLATFORMS } from '../contests/types.js';
 import { ContestRepository } from '../contests/repository.js';
-import { Contest } from '../contests/types.js';
 import { DiscordClient } from '../discord/client.js';
 import { NotificationScheduler } from '../notifications/scheduler.js';
 import { logger } from '../utils/logger.js';
@@ -36,11 +36,9 @@ export async function executeDailyDigest(options?: {
       const tz = server.timezone || config.defaultTimezone;
       const { startUtc, endUtc } = getServerDayBounds(now, tz);
 
-      // Check server platform preferences
+      // Check server platform preferences (defaults to Codeforces, CodeChef, LeetCode)
       const enabledPlatforms = await repo.getServerEnabledPlatforms(server.guildId);
-      const platformsFilter = enabledPlatforms.length > 0 ? enabledPlatforms : undefined;
-
-      const contests = await repo.findContestsInWindow(startUtc, endUtc, platformsFilter);
+      const contests = await repo.findContestsInWindow(startUtc, endUtc, enabledPlatforms);
 
       // Ensure start notifications are scheduled for these contests
       for (const contest of contests) {
@@ -69,7 +67,7 @@ export async function executeDailyDigest(options?: {
       serversProcessed = 1;
       const tz = config.defaultTimezone;
       const { startUtc, endUtc } = getServerDayBounds(now, tz);
-      const contests = await repo.findContestsInWindow(startUtc, endUtc);
+      const contests = await repo.findContestsInWindow(startUtc, endUtc, DEFAULT_PLATFORMS);
 
       for (const contest of contests) {
         if (contest.status === 'SCHEDULED') {

@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { DEFAULT_PLATFORMS } from '../contests/types.js';
 import { ContestRepository } from '../contests/repository.js';
 import { DiscordClient } from '../discord/client.js';
 import { logger } from '../utils/logger.js';
@@ -85,10 +86,9 @@ export async function executeContestStartNotification(
         continue;
       }
 
-      // Check server platform filter
+      // Check server platform filter (defaults to CodeChef, Codeforces, LeetCode)
       const enabledPlatforms = await repo.getServerEnabledPlatforms(server.guildId);
-      const isPlatformEnabled =
-        enabledPlatforms.length === 0 || enabledPlatforms.includes(contest.platform.toLowerCase());
+      const isPlatformEnabled = enabledPlatforms.includes(contest.platform.toLowerCase());
 
       if (!isPlatformEnabled) {
         logger.debug(`Server ${server.guildId} has filtered out platform ${contest.platform}`);
@@ -110,8 +110,9 @@ export async function executeContestStartNotification(
     // Single-server fallback from environment
     const defaultChannel = config.discord.defaultStartedChannelId;
     const defaultWebhook = config.discord.defaultWebhookUrl;
+    const isPlatformDefault = DEFAULT_PLATFORMS.includes(contest.platform.toLowerCase());
 
-    if (defaultChannel || defaultWebhook) {
+    if ((defaultChannel || defaultWebhook) && isPlatformDefault) {
       try {
         const sent = await discord.sendContestStarted(contest, {
           channelId: defaultChannel,
@@ -123,7 +124,7 @@ export async function executeContestStartNotification(
         logger.error('Failed to send contest start notification to default channel/webhook', err);
       }
     } else {
-      logger.warn('No Discord servers configured and no default channel/webhook defined.');
+      logger.warn(`No Discord server subscribed or platform ${contest.platform} not enabled by default.`);
     }
   }
 

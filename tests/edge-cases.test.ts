@@ -117,9 +117,9 @@ describe('Edge Cases & Resiliency (Section 19)', () => {
 
     const result = await repo.upsertContest({
       externalId: 'no-end-time',
-      platform: 'hackerearth',
-      name: 'Indefinite Hackathon',
-      url: 'https://hackerearth.com/hackathon',
+      platform: 'codeforces',
+      name: 'Indefinite Contest',
+      url: 'https://codeforces.com/contest/indefinite',
       startTime,
       endTime: null,
       duration: null,
@@ -131,7 +131,7 @@ describe('Edge Cases & Resiliency (Section 19)', () => {
 
     await repo.upsertServer({
       guildId: 'server-no-end',
-      startedChannelId: 'chan-hack',
+      startedChannelId: 'chan-cf',
       timezone: 'UTC',
       enabled: true,
     });
@@ -174,7 +174,6 @@ describe('Edge Cases & Resiliency (Section 19)', () => {
 
     const mockDiscord = { sendContestStarted: vi.fn().mockResolvedValue(true) } as unknown as DiscordClient;
 
-    // Simulate 3 concurrent executions of the workload attempting to notify at the same millisecond
     const results = await Promise.all([
       executeContestStartNotification(contest.id, { repo, discordClient: mockDiscord }),
       executeContestStartNotification(contest.id, { repo, discordClient: mockDiscord }),
