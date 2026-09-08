@@ -43,16 +43,21 @@ export const handler: Handler = async (event) => {
     };
   }
 
-  // 2. Verify Discord cryptographic signature
-  const isValidRequest = verifyKey(rawBody, signature, timestamp, publicKey);
+  // 2. Cryptographically verify signature using ED25519 (must await verifyKey)
+  const isValidRequest = await verifyKey(rawBody, signature, timestamp, publicKey);
   if (!isValidRequest) {
     logger.warn('Received invalid Discord interaction signature');
     return { statusCode: 401, body: 'Invalid request signature' };
   }
 
-  const interaction = JSON.parse(rawBody);
+  let interaction: any;
+  try {
+    interaction = JSON.parse(rawBody);
+  } catch {
+    return { statusCode: 400, body: 'Invalid JSON payload' };
+  }
 
-  // 3. Respond to Discord PING (required for endpoint validation)
+  // 3. Respond to Discord PING (required for endpoint validation in Developer Portal)
   if (interaction.type === InteractionType.PING) {
     return {
       statusCode: 200,
