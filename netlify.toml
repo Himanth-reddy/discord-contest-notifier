@@ -1,0 +1,16 @@
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["src/database/schema.sql"]
+
+[functions."sync-contests"]
+  schedule = "0 */2 * * *" # Runs every 2 hours UTC
+
+[functions."daily-digest"]
+  schedule = "0 0 * * *"   # Runs daily at 00:00 UTC
+
+[functions."weekly-digest"]
+  schedule = "0 0 * * 1"   # Runs weekly on Monday at 00:00 UTC
