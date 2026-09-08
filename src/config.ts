@@ -15,6 +15,7 @@ export interface AppConfig {
   discord: {
     botToken?: string;
     applicationId?: string;
+    publicKey?: string;
     defaultStartedChannelId?: string;
     defaultDailyChannelId?: string;
     defaultWeeklyChannelId?: string;
@@ -37,6 +38,7 @@ export const config: AppConfig = {
   discord: {
     botToken: process.env.DISCORD_BOT_TOKEN,
     applicationId: process.env.DISCORD_APPLICATION_ID,
+    publicKey: process.env.DISCORD_PUBLIC_KEY,
     defaultStartedChannelId: process.env.DEFAULT_STARTED_CHANNEL_ID,
     defaultDailyChannelId: process.env.DEFAULT_DAILY_CHANNEL_ID,
     defaultWeeklyChannelId: process.env.DEFAULT_WEEKLY_CHANNEL_ID,

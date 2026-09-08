@@ -8,7 +8,8 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run build && node dist/scripts/test-connections.js"
+    "check": "npm run build && node dist/scripts/test-connections.js",
+    "commands:register": "npm run build && node dist/scripts/register-commands.js"
   },
   "keywords": [
     "discord",
@@ -25,6 +26,7 @@
     "@netlify/functions": "^6.0.0",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
+    "discord-interactions": "^4.4.0",
     "dotenv": "^17.4.2",
     "pg": "^8.23.0"
   },
