@@ -181,7 +181,7 @@ export function isServerDailyDigestDue(
 export function isServerWeeklyDigestDue(
   timezone: string,
   lastSentAt: Date | null | undefined,
-  targetHour: number = 8,
+  targetHour: number = 7,
   targetDayOfWeek: number = 1, // 1 = Monday
   now: Date = new Date()
 ): boolean {

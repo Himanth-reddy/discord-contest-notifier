@@ -186,7 +186,6 @@ describe('Daily & Weekly Digests', () => {
       expect.any(Array),
       expect.objectContaining({
         channelId: 'chan-india-daily',
-        alertRoleId: 'role-contestants',
         timezone: 'Asia/Kolkata',
       })
     );
@@ -211,5 +210,47 @@ describe('Daily & Weekly Digests', () => {
       force: false,
     });
     expect(resultAfternoon.digestsSent).toBe(0);
+  });
+
+  it('should deliver weekly digest at 7:00 AM on Monday in local timezone', async () => {
+    await repo.upsertServer({
+      guildId: 'server-weekly-7am',
+      timezone: 'Asia/Kolkata',
+      weeklyChannelId: 'chan-weekly-7am',
+      alertRoleId: 'role-contestants',
+      enabled: true,
+    });
+
+    const mockSendWeekly = vi.fn().mockResolvedValue(true);
+    const mockDiscord = { sendWeeklyDigest: mockSendWeekly } as unknown as DiscordClient;
+
+    // 2026-09-14 is Monday. 07:00 AM IST is 01:30 AM UTC
+    const monday7amIST = new Date('2026-09-14T01:30:00.000Z');
+
+    const result = await executeWeeklyDigest({
+      repo,
+      discord: mockDiscord,
+      now: monday7amIST,
+      force: false,
+    });
+
+    expect(result.digestsSent).toBe(1);
+    expect(mockSendWeekly).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        channelId: 'chan-weekly-7am',
+        timezone: 'Asia/Kolkata',
+      })
+    );
+
+    // Tuesday at 7:00 AM IST should NOT send weekly digest
+    const tuesday7amIST = new Date('2026-09-15T01:30:00.000Z');
+    const resultTuesday = await executeWeeklyDigest({
+      repo,
+      discord: mockDiscord,
+      now: tuesday7amIST,
+      force: false,
+    });
+    expect(resultTuesday.digestsSent).toBe(0);
   });
 });

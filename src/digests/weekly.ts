@@ -29,7 +29,7 @@ export async function executeWeeklyDigest(options?: WeeklyDigestOptions): Promis
       }
 
       const tz = server.timezone || config.defaultTimezone;
-      const targetHour = server.digestHour ?? 8;
+      const targetHour = 7; // 7:00 AM local time on Monday
 
       if (!options?.force) {
         const isDue = isServerWeeklyDigestDue(tz, server.lastWeeklyDigestAt, targetHour, 1, now);

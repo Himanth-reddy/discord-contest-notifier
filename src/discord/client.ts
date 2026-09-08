@@ -109,9 +109,6 @@ export class DiscordClient {
   async sendDailyDigest(contests: Contest[], destination: DiscordDestination): Promise<boolean> {
     const tz = destination.timezone || config.defaultTimezone;
     const payload = formatDailyDigestMessage(contests, tz);
-    if (destination.alertRoleId) {
-      payload.content = `<@&${destination.alertRoleId}> 📅 **Daily Contest Digest**`;
-    }
     logger.info(`Sending daily digest (${contests.length} contests) to Discord`);
     return this.sendMessage(payload, destination);
   }
@@ -119,9 +116,6 @@ export class DiscordClient {
   async sendWeeklyDigest(contests: Contest[], destination: DiscordDestination): Promise<boolean> {
     const tz = destination.timezone || config.defaultTimezone;
     const payload = formatWeeklyDigestMessage(contests, tz);
-    if (destination.alertRoleId) {
-      payload.content = `<@&${destination.alertRoleId}> 🏆 **Weekly Contest Digest**`;
-    }
     logger.info(`Sending weekly digest (${contests.length} contests) to Discord`);
     return this.sendMessage(payload, destination);
   }

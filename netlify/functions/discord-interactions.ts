@@ -268,12 +268,12 @@ export const handler: Handler = async (event) => {
           { name: 'Timezone', value: currentServer.timezone, inline: true },
           {
             name: 'Alert Role',
-            value: currentServer.alertRoleId ? `<@&${currentServer.alertRoleId}>` : 'None *(silent alerts)*',
+            value: currentServer.alertRoleId ? `<@&${currentServer.alertRoleId}> *(live alerts only)*` : 'None *(silent)*',
             inline: true,
           },
           {
-            name: 'Morning Digest Time',
-            value: `${currentServer.digestHour ?? 8}:00 AM local time`,
+            name: 'Digest Times',
+            value: `Daily: ${currentServer.digestHour ?? 8}:00 AM\nWeekly: Monday 7:00 AM`,
             inline: true,
           },
           {
@@ -457,8 +457,8 @@ export const handler: Handler = async (event) => {
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {
               content: roleId
-                ? `✅ **Alert Role Configured!**\nThe bot will now ping <@&${roleId}> when live contest alerts and digests drop.`
-                : `✅ **Alert Role Cleared.**\nNotifications will now be posted silently without role pings.`,
+                ? `✅ **Alert Role Configured!**\nThe bot will now ping <@&${roleId}> for **live contest start alerts** (daily and weekly digests remain silent).`
+                : `✅ **Alert Role Cleared.**\nAll notifications will now be posted silently without role pings.`,
             },
           }),
         };
@@ -481,7 +481,7 @@ export const handler: Handler = async (event) => {
           lastSyncedAt: new Date(),
         };
 
-        // 1. Test live contest start channel
+        // 1. Test live contest start channel (includes role ping preview if set)
         if (currentServer.startedChannelId) {
           try {
             await discordClient.sendContestStarted(sampleContest, {
@@ -497,13 +497,12 @@ export const handler: Handler = async (event) => {
           results.push(`• **Live Alerts Channel:** ⚠️ Not configured (run \`/config channels started:#channel\`)`);
         }
 
-        // 2. Test daily digest channel
+        // 2. Test daily digest channel (silent)
         if (currentServer.dailyChannelId) {
           try {
             await discordClient.sendDailyDigest([sampleContest], {
               channelId: currentServer.dailyChannelId,
               timezone: currentServer.timezone,
-              alertRoleId: currentServer.alertRoleId,
             });
             results.push(`• **Daily Digest Channel:** ✅ Sent test digest to <#${currentServer.dailyChannelId}>`);
           } catch (err: any) {
@@ -513,13 +512,12 @@ export const handler: Handler = async (event) => {
           results.push(`• **Daily Digest Channel:** ⚠️ Not configured (run \`/config channels daily:#channel\`)`);
         }
 
-        // 3. Test weekly digest channel
+        // 3. Test weekly digest channel (silent)
         if (currentServer.weeklyChannelId) {
           try {
             await discordClient.sendWeeklyDigest([sampleContest], {
               channelId: currentServer.weeklyChannelId,
               timezone: currentServer.timezone,
-              alertRoleId: currentServer.alertRoleId,
             });
             results.push(`• **Weekly Digest Channel:** ✅ Sent test weekly digest to <#${currentServer.weeklyChannelId}>`);
           } catch (err: any) {

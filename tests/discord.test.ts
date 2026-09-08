@@ -174,4 +174,45 @@ describe('Discord Formatting & HTTP Client', () => {
     expect(success).toBe(true);
     expect(callCount).toBe(2);
   });
+
+  it('should only include role ping for contest started alerts and never for digests', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+
+    const client = new DiscordClient({
+      botToken: 'bot-token',
+      fetchFn: mockFetch as unknown as typeof fetch,
+    });
+
+    // 1. Contest started alert WITH alertRoleId -> should have <@&role-123>
+    await client.sendContestStarted(sampleContest, {
+      channelId: 'chan-started',
+      alertRoleId: 'role-123',
+    });
+    const startedCall = mockFetch.mock.calls[0];
+    const startedBody = JSON.parse(startedCall[1].body as string);
+    expect(startedBody.content).toContain('<@&role-123>');
+
+    // 2. Daily digest WITH alertRoleId -> should NOT have role ping
+    await client.sendDailyDigest([sampleContest], {
+      channelId: 'chan-daily',
+      alertRoleId: 'role-123',
+    });
+    const dailyCall = mockFetch.mock.calls[1];
+    const dailyBody = JSON.parse(dailyCall[1].body as string);
+    expect(dailyBody.content).toBeUndefined();
+
+    // 3. Weekly digest WITH alertRoleId -> should NOT have role ping
+    await client.sendWeeklyDigest([sampleContest], {
+      channelId: 'chan-weekly',
+      alertRoleId: 'role-123',
+    });
+    const weeklyCall = mockFetch.mock.calls[2];
+    const weeklyBody = JSON.parse(weeklyCall[1].body as string);
+    expect(weeklyBody.content).toBeUndefined();
+  });
 });
+
