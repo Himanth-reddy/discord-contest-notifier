@@ -14,6 +14,6 @@
     "declaration": true,
     "sourceMap": true
   },
-  "include": ["src/**/*", "netlify/**/*", "tests/**/*"],
+  "include": ["src/**/*", "netlify/**/*", "tests/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist"]
 }
