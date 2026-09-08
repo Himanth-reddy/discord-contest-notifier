@@ -65,47 +65,37 @@ export class ContestRepository {
   ): Promise<UpsertContestResult> {
     const existing = await this.findByExternalId(input.platform, input.externalId);
 
-    if (!existing) {
-      const id = crypto.randomUUID();
-      const rows = await this.db.query(
-        `INSERT INTO contests (id, external_id, platform, name, url, start_time, end_time, duration, status, last_synced_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         RETURNING *`,
-        [
-          id,
-          input.externalId,
-          input.platform,
-          input.name,
-          input.url,
-          input.startTime,
-          input.endTime,
-          input.duration,
-          input.status,
-          syncedAt,
-        ]
-      );
-
-      return {
-        contest: this.mapRowToContest(rows[0]),
-        changeType: 'NEW',
-      };
-    }
-
+    const id = existing ? existing.id : crypto.randomUUID();
     let changeType: UpsertChangeType = 'UNCHANGED';
-    const oldStartTime = existing.startTime;
+    let oldStartTime: Date | undefined;
 
-    if (existing.status !== 'CANCELLED' && input.status === 'CANCELLED') {
-      changeType = 'CANCELLED';
-    } else if (Math.abs(existing.startTime.getTime() - input.startTime.getTime()) > 1000) {
-      changeType = 'RESCHEDULED';
+    if (!existing) {
+      changeType = 'NEW';
+    } else {
+      oldStartTime = existing.startTime;
+      if (existing.status !== 'CANCELLED' && input.status === 'CANCELLED') {
+        changeType = 'CANCELLED';
+      } else if (Math.abs(existing.startTime.getTime() - input.startTime.getTime()) > 1000) {
+        changeType = 'RESCHEDULED';
+      }
     }
 
     const rows = await this.db.query(
-      `UPDATE contests
-       SET name = $1, url = $2, start_time = $3, end_time = $4, duration = $5, status = $6, last_synced_at = $7
-       WHERE id = $8
+      `INSERT INTO contests (id, external_id, platform, name, url, start_time, end_time, duration, status, last_synced_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (platform, external_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         url = EXCLUDED.url,
+         start_time = EXCLUDED.start_time,
+         end_time = EXCLUDED.end_time,
+         duration = EXCLUDED.duration,
+         status = EXCLUDED.status,
+         last_synced_at = EXCLUDED.last_synced_at
        RETURNING *`,
       [
+        id,
+        input.externalId,
+        input.platform,
         input.name,
         input.url,
         input.startTime,
@@ -113,7 +103,6 @@ export class ContestRepository {
         input.duration,
         input.status,
         syncedAt,
-        existing.id,
       ]
     );
 
@@ -189,6 +178,10 @@ export class ContestRepository {
       const rows = await this.db.query(
         `INSERT INTO contest_notifications (id, contest_id, notification_type, scheduled_for, sent_at, created_at, updated_at)
          VALUES ($1, $2, $3, $4, NULL, $5, $6)
+         ON CONFLICT (contest_id, notification_type) DO UPDATE SET
+           scheduled_for = EXCLUDED.scheduled_for,
+           updated_at = EXCLUDED.updated_at
+         WHERE contest_notifications.sent_at IS NULL
          RETURNING *`,
         [id, contestId, type, scheduledFor, now, now]
       );

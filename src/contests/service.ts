@@ -42,20 +42,28 @@ export class ContestService {
   async syncContests(options: SyncContestsOptions = {}): Promise<SyncSummary> {
     const now = new Date();
     const syncTime = now;
-    // Default window: contests active now or starting in the next 14 days
     const startGte = options.since || new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const startLte = options.until || new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
 
     logger.info(`Starting CLIST synchronization (window: ${startGte.toISOString()} to ${startLte.toISOString()})`);
 
-    const normalizedList = await this.clistClient.fetchContests({
+    const rawList = await this.clistClient.fetchContests({
       startGte,
       startLte,
       resources: options.resources,
       limit: options.limit || 100,
     });
 
-    logger.info(`Fetched ${normalizedList.length} contests from CLIST API`);
+    // Deduplicate CLIST results by (platform, externalId)
+    const seen = new Set<string>();
+    const normalizedList = rawList.filter((item) => {
+      const key = `${item.platform.toLowerCase()}:${item.externalId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    logger.info(`Fetched ${rawList.length} contests (${normalizedList.length} unique) from CLIST API`);
 
     let newCount = 0;
     let rescheduledCount = 0;
@@ -64,7 +72,6 @@ export class ContestService {
     const processedContests: Contest[] = [];
 
     for (const item of normalizedList) {
-      // Determine initial status based on current time
       let status: ContestStatus = 'SCHEDULED';
       if (item.endTime && item.endTime.getTime() <= now.getTime()) {
         status = 'FINISHED';
@@ -108,7 +115,6 @@ export class ContestService {
 
         case 'UNCHANGED':
           unchangedCount++;
-          // Ensure notification is recorded in case DB was wiped or partially synced
           if (contest.status === 'SCHEDULED' || contest.status === 'RUNNING') {
             const notif = await this.repo.getNotification(contest.id, 'CONTEST_STARTED');
             if (!notif) {
