@@ -6,11 +6,31 @@ import { CONTEST_START_EVENT, ContestStartEventData, WorkloadDispatcher } from '
 
 export class NotificationScheduler {
   private repo: ContestRepository;
-  private dispatcher: WorkloadDispatcher;
+  private dispatcher?: WorkloadDispatcher;
 
   constructor(repo?: ContestRepository, dispatcher?: WorkloadDispatcher) {
     this.repo = repo || new ContestRepository();
-    this.dispatcher = dispatcher || (new AsyncWorkloadsClient() as unknown as WorkloadDispatcher);
+
+    if (dispatcher) {
+      this.dispatcher = dispatcher;
+    } else {
+      try {
+        const siteUrl =
+          process.env.URL ||
+          process.env.DEPLOY_URL ||
+          'https://discordcontestnotifier.netlify.app';
+        const apiKey =
+          process.env.NETLIFY_ASYNC_WORKLOADS_API_KEY ||
+          process.env.NETLIFY_AUTH_TOKEN;
+
+        this.dispatcher = new AsyncWorkloadsClient({
+          baseUrl: siteUrl,
+          apiKey,
+        }) as unknown as WorkloadDispatcher;
+      } catch (err: any) {
+        logger.warn(`Could not initialize AsyncWorkloadsClient: ${err.message}`);
+      }
+    }
   }
 
   /**
@@ -22,13 +42,17 @@ export class NotificationScheduler {
 
     // If already sent, do not re-schedule
     if (existing?.sentAt) {
-      logger.info(`Notification for contest ${contest.id} (${contest.name}) already sent at ${existing.sentAt.toISOString()}`);
+      logger.info(
+        `Notification for contest ${contest.id} (${contest.name}) already sent at ${existing.sentAt.toISOString()}`
+      );
       return;
     }
 
     // If contest has already ended, do not schedule
     if (contest.endTime && contest.endTime.getTime() <= now.getTime()) {
-      logger.info(`Contest ${contest.id} (${contest.name}) has already ended. Skipping notification scheduling.`);
+      logger.info(
+        `Contest ${contest.id} (${contest.name}) has already ended. Skipping notification scheduling.`
+      );
       return;
     }
 
@@ -36,6 +60,11 @@ export class NotificationScheduler {
     await this.repo.scheduleNotification(contest.id, contest.startTime, 'CONTEST_STARTED');
 
     // Dispatch Netlify Async Workload event
+    if (!this.dispatcher) {
+      logger.warn(`No workload dispatcher available for contest ${contest.id}`);
+      return;
+    }
+
     const eventPayload: ContestStartEventData = {
       contestId: contest.id,
       scheduledStartTime: contest.startTime.toISOString(),
@@ -46,10 +75,13 @@ export class NotificationScheduler {
         data: eventPayload,
         delayUntil: contest.startTime.toISOString(),
       });
-      logger.info(`Dispatched Async Workload for contest ${contest.id} (${contest.name}) starting at ${contest.startTime.toISOString()}`);
-    } catch (err) {
-      logger.error(`Failed to dispatch Async Workload for contest ${contest.id}`, err);
-      // Even if dispatching failed transiently, it is persisted in DB and can be picked up by sync/digest
+      logger.info(
+        `Dispatched Async Workload for contest ${contest.id} (${contest.name}) starting at ${contest.startTime.toISOString()}`
+      );
+    } catch (err: any) {
+      logger.warn(
+        `Async Workload dispatch deferred for contest ${contest.id}: ${err.message}. Notification remains securely scheduled in database.`
+      );
     }
   }
 
@@ -58,7 +90,9 @@ export class NotificationScheduler {
    */
   async rescheduleContestStart(contest: Contest, oldStartTime?: Date): Promise<void> {
     logger.info(
-      `Contest ${contest.id} (${contest.name}) rescheduled from ${oldStartTime?.toISOString() ?? 'unknown'} to ${contest.startTime.toISOString()}`
+      `Contest ${contest.id} (${contest.name}) rescheduled from ${
+        oldStartTime?.toISOString() ?? 'unknown'
+      } to ${contest.startTime.toISOString()}`
     );
 
     const existing = await this.repo.getNotification(contest.id, 'CONTEST_STARTED');
@@ -69,6 +103,8 @@ export class NotificationScheduler {
 
     // Update scheduled_for in DB
     await this.repo.scheduleNotification(contest.id, contest.startTime, 'CONTEST_STARTED');
+
+    if (!this.dispatcher) return;
 
     // Dispatch a new workload event for the updated time
     const eventPayload: ContestStartEventData = {
@@ -82,8 +118,10 @@ export class NotificationScheduler {
         delayUntil: contest.startTime.toISOString(),
       });
       logger.info(`Dispatched updated Async Workload for rescheduled contest ${contest.id}`);
-    } catch (err) {
-      logger.error(`Failed to dispatch updated Async Workload for rescheduled contest ${contest.id}`, err);
+    } catch (err: any) {
+      logger.warn(
+        `Could not dispatch updated Async Workload for rescheduled contest ${contest.id}: ${err.message}`
+      );
     }
   }
 }
