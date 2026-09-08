@@ -43,6 +43,15 @@ CREATE TABLE IF NOT EXISTS servers (
     enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+-- Master table storing all available competitive programming platforms
+CREATE TABLE IF NOT EXISTS platforms (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Per-server platform subscriptions
 CREATE TABLE IF NOT EXISTS server_platforms (
     guild_id VARCHAR(64) NOT NULL REFERENCES servers(guild_id) ON DELETE CASCADE,

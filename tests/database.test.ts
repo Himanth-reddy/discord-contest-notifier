@@ -161,4 +161,48 @@ describe('Database & Repository Integration', () => {
     expect(platforms).toContain('leetcode');
     expect(platforms).not.toContain('codechef');
   });
+
+  it('should fetch all platforms and default platforms from database', async () => {
+    const allPlatforms = await repo.getAllPlatforms();
+    expect(allPlatforms.length).toBeGreaterThanOrEqual(16);
+
+    const platformIds = allPlatforms.map((p) => p.id);
+    expect(platformIds).toContain('codeforces');
+    expect(platformIds).toContain('codechef');
+    expect(platformIds).toContain('leetcode');
+    expect(platformIds).toContain('atcoder');
+
+    const defaults = await repo.getDefaultPlatformIds();
+    expect(defaults).toEqual(['codeforces', 'codechef', 'leetcode']);
+
+    // Default fallback for a new server with no custom platform configuration
+    const serverDefaults = await repo.getServerEnabledPlatforms('brand-new-guild');
+    expect(serverDefaults).toEqual(['codeforces', 'codechef', 'leetcode']);
+  });
+
+  it('should support bulk setting platforms and auto-inserting new platforms', async () => {
+    await repo.upsertServer({
+      guildId: 'guild-bulk',
+      timezone: 'UTC',
+      enabled: true,
+    });
+
+    // Bulk select codeforces and atcoder only
+    await repo.setServerPlatforms('guild-bulk', ['codeforces', 'atcoder']);
+
+    const enabled = await repo.getServerEnabledPlatforms('guild-bulk');
+    expect(enabled).toHaveLength(2);
+    expect(enabled).toContain('codeforces');
+    expect(enabled).toContain('atcoder');
+    expect(enabled).not.toContain('leetcode');
+    expect(enabled).not.toContain('codechef');
+
+    // Auto-discover and insert a new platform
+    await repo.ensurePlatformExists('usaco', 'USACO', 'USA Computing Olympiad');
+    const updatedPlatforms = await repo.getAllPlatforms();
+    const usaco = updatedPlatforms.find((p) => p.id === 'usaco');
+    expect(usaco).toBeDefined();
+    expect(usaco?.name).toBe('USACO');
+    expect(usaco?.isDefault).toBe(false);
+  });
 });

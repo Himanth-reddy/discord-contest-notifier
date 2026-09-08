@@ -5,7 +5,7 @@ import {
   verifyKey,
 } from 'discord-interactions';
 import { config } from '../../src/config.js';
-import { ALL_PLATFORMS } from '../../src/contests/types.js';
+import { PlatformRecord } from '../../src/contests/types.js';
 import { ContestRepository } from '../../src/contests/repository.js';
 import { ContestService } from '../../src/contests/service.js';
 import {
@@ -81,7 +81,8 @@ export const handler: Handler = async (event) => {
       const selectedPlatforms: string[] = interaction.data?.values || [];
       await repo.setServerPlatforms(guildId, selectedPlatforms);
 
-      const displayNames = ALL_PLATFORMS
+      const allPlatforms = await repo.getAllPlatforms();
+      const displayNames = allPlatforms
         .filter((p) => selectedPlatforms.includes(p.id))
         .map((p) => `• **${p.name}**`);
 
@@ -234,10 +235,11 @@ export const handler: Handler = async (event) => {
       }
 
       if (subCommand === 'view') {
+        const allPlatforms = await repo.getAllPlatforms();
         const platforms = await repo.getServerEnabledPlatforms(guildId);
         const platformText = platforms
           .map((p) => {
-            const info = ALL_PLATFORMS.find((item) => item.id === p);
+            const info = allPlatforms.find((item) => item.id === p);
             return `• **${info ? info.name : p.toUpperCase()}**`;
           })
           .join('\n');
@@ -279,12 +281,13 @@ export const handler: Handler = async (event) => {
 
       // Subcommand: /config platforms (Interactive Dropdown Menu)
       if (subCommand === 'platforms') {
+        const allPlatforms = await repo.getAllPlatforms();
         const currentlyEnabled = await repo.getServerEnabledPlatforms(guildId);
 
-        const selectOptions = ALL_PLATFORMS.map((p) => ({
+        const selectOptions = allPlatforms.map((p) => ({
           label: p.name,
           value: p.id,
-          description: p.description.slice(0, 50),
+          description: (p.description || '').slice(0, 50),
           default: currentlyEnabled.includes(p.id),
         }));
 
@@ -304,7 +307,7 @@ export const handler: Handler = async (event) => {
                       custom_id: 'select_platforms',
                       placeholder: 'Select platforms...',
                       min_values: 1,
-                      max_values: ALL_PLATFORMS.length,
+                      max_values: allPlatforms.length,
                       options: selectOptions,
                     },
                   ],
@@ -322,7 +325,8 @@ export const handler: Handler = async (event) => {
 
         await repo.setServerPlatform(guildId, platformName, enabled);
 
-        const info = ALL_PLATFORMS.find((p) => p.id === platformName.toLowerCase());
+        const allPlatforms = await repo.getAllPlatforms();
+        const info = allPlatforms.find((p) => p.id === platformName.toLowerCase());
         const prettyName = info ? info.name : platformName.toUpperCase();
 
         return {

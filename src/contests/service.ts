@@ -79,6 +79,8 @@ export class ContestService {
         status = 'RUNNING';
       }
 
+      await this.repo.ensurePlatformExists(item.platform, item.platform);
+
       const upsertResult = await this.repo.upsertContest(
         {
           externalId: item.externalId,

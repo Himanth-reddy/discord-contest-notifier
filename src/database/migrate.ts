@@ -45,19 +45,45 @@ CREATE TABLE IF NOT EXISTS servers (
     enabled BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+CREATE TABLE IF NOT EXISTS platforms (
+    id VARCHAR(64) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    is_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS server_platforms (
     guild_id VARCHAR(64) NOT NULL REFERENCES servers(guild_id) ON DELETE CASCADE,
     platform VARCHAR(100) NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT TRUE,
     PRIMARY KEY (guild_id, platform)
 );
+
+INSERT INTO platforms (id, name, description, is_default) VALUES
+  ('codeforces', 'Codeforces', 'Div 1/2/3/4 & Educational Rounds', TRUE),
+  ('codechef', 'CodeChef', 'Starters, Cook-Offs, Lunchtimes', TRUE),
+  ('leetcode', 'LeetCode', 'Weekly & Biweekly Contests', TRUE),
+  ('atcoder', 'AtCoder', 'Beginner (ABC), Regular (ARC), Grand (AGC)', FALSE),
+  ('hackerrank', 'HackerRank', 'Algorithms & Coding Challenges', FALSE),
+  ('hackerearth', 'HackerEarth', 'Circuits, Easy & Hackathons', FALSE),
+  ('topcoder', 'TopCoder', 'Single Round Matches (SRM)', FALSE),
+  ('geeksforgeeks', 'GeeksforGeeks', 'Weekly Contests & Bi-Wizard', FALSE),
+  ('kaggle', 'Kaggle', 'ML & Data Science Competitions', FALSE),
+  ('csacademy', 'CS Academy', 'Algorithms Rounds', FALSE),
+  ('dmoj', 'DMOJ', 'High School & Open Contests', FALSE),
+  ('luogu', 'Luogu (洛谷)', 'ICPC, Provincial & Open Contests', FALSE),
+  ('nowcoder', 'NowCoder (牛客网)', 'ACM & IOI Style Contests', FALSE),
+  ('ctftime', 'CTFtime', 'Capture The Flag Cybersecurity Contests', FALSE),
+  ('yukicoder', 'Yukicoder', 'Japanese Competitive Programming', FALSE),
+  ('toph', 'Toph', 'Bangladesh Programming Contests', FALSE)
+ON CONFLICT (id) DO NOTHING;
 `;
 
 export async function runMigrations(adapter?: DatabaseAdapter): Promise<void> {
   const db = adapter || getDatabaseAdapter();
   logger.info('Running database migrations...');
 
-  // Split queries by semicolon (ignoring empty lines)
   const statements = SCHEMA_SQL
     .split(';')
     .map((s) => s.trim())
@@ -70,7 +96,6 @@ export async function runMigrations(adapter?: DatabaseAdapter): Promise<void> {
   logger.info('Database migrations completed successfully.');
 }
 
-// Allow direct execution: ts-node or node migrate.js
 if (process.argv[1]?.endsWith('migrate.ts') || process.argv[1]?.endsWith('migrate.js')) {
   runMigrations()
     .then(() => {

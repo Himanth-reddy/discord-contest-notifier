@@ -1,11 +1,15 @@
 import { Handler } from '@netlify/functions';
 import { registerSlashCommands, SLASH_COMMANDS } from '../../src/discord/commands.js';
+import { runMigrations } from '../../src/database/migrate.js';
 import { logger } from '../../src/utils/logger.js';
 
 export const handler: Handler = async (event) => {
   logger.info('Registering slash commands with Discord API');
   try {
     const guildId = event.queryStringParameters?.guildId || '1546470499385741312';
+
+    // Ensure database tables and seeded platforms exist
+    await runMigrations();
 
     // Register to specific guild for INSTANT (0-second) cache update
     await registerSlashCommands({ guildId });

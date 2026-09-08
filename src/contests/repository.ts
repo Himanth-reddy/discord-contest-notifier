@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { DatabaseAdapter } from '../database/adapter.js';
 import { getDatabaseAdapter } from '../database/connection.js';
+import { logger } from '../utils/logger.js';
 import {
   ALL_PLATFORMS,
   DEFAULT_PLATFORMS,
@@ -8,6 +9,7 @@ import {
   ContestNotification,
   ContestStatus,
   NotificationType,
+  PlatformRecord,
   ServerConfig,
   ServerPlatform,
   UpsertChangeType,
@@ -282,8 +284,66 @@ export class ContestRepository {
   }
 
   /**
+   * Returns all platforms available in the database, ordered by default first then name.
+   * Falls back to ALL_PLATFORMS if the table is empty or migrations have not run.
+   */
+  async getAllPlatforms(): Promise<PlatformRecord[]> {
+    try {
+      const rows = await this.db.query(
+        'SELECT id, name, description, is_default, created_at FROM platforms ORDER BY is_default DESC, name ASC'
+      );
+      if (rows.length > 0) {
+        return rows.map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          isDefault: r.is_default === true || r.is_default === 1,
+          createdAt: r.created_at instanceof Date ? r.created_at : new Date(r.created_at || Date.now()),
+        }));
+      }
+    } catch (err) {
+      logger.warn('Failed to query platforms table, falling back to ALL_PLATFORMS', err);
+    }
+    return ALL_PLATFORMS;
+  }
+
+  /**
+   * Returns default platform IDs configured in the database.
+   */
+  async getDefaultPlatformIds(): Promise<string[]> {
+    try {
+      const rows = await this.db.query(
+        'SELECT id FROM platforms WHERE is_default = true'
+      );
+      if (rows.length > 0) {
+        return rows.map((r) => r.id.toLowerCase());
+      }
+    } catch (err) {
+      logger.warn('Failed to query default platforms from database, falling back to DEFAULT_PLATFORMS', err);
+    }
+    return [...DEFAULT_PLATFORMS];
+  }
+
+  /**
+   * Ensures that a platform exists in the database. Useful when CLIST synchronizes a contest
+   * from a new platform.
+   */
+  async ensurePlatformExists(id: string, name: string, description?: string): Promise<void> {
+    try {
+      await this.db.execute(
+        `INSERT INTO platforms (id, name, description, is_default)
+         VALUES ($1, $2, $3, FALSE)
+         ON CONFLICT (id) DO NOTHING`,
+        [id.toLowerCase(), name, description || null]
+      );
+    } catch (err) {
+      logger.warn(`Failed to insert platform ${id} into platforms table`, err);
+    }
+  }
+
+  /**
    * Returns all enabled platforms for a given server.
-   * If the server has no customized platforms configured, returns DEFAULT_PLATFORMS (CodeChef, Codeforces, LeetCode).
+   * If the server has no customized platforms configured, returns database default platforms (CodeChef, Codeforces, LeetCode).
    */
   async getServerEnabledPlatforms(guildId: string): Promise<string[]> {
     const rows = await this.db.query(
@@ -297,7 +357,7 @@ export class ContestRepository {
       );
       // If server never customized platform settings, use defaults
       if (anyRows.length === 0) {
-        return [...DEFAULT_PLATFORMS];
+        return await this.getDefaultPlatformIds();
       }
       return [];
     }
@@ -316,16 +376,18 @@ export class ContestRepository {
 
   /**
    * Sets all platforms for a server at once (e.g. from multi-select dropdown in Discord).
+   * Populates status for every known platform in the database.
    */
   async setServerPlatforms(guildId: string, selectedPlatforms: string[]): Promise<void> {
+    const allPlatforms = await this.getAllPlatforms();
     const selectedNormalized = selectedPlatforms.map((p) => p.toLowerCase());
     await this.db.transaction(async (tx) => {
       await tx.execute('DELETE FROM server_platforms WHERE guild_id = $1', [guildId]);
-      for (const platform of ALL_PLATFORMS) {
-        const isEnabled = selectedNormalized.includes(platform.id);
+      for (const platform of allPlatforms) {
+        const isEnabled = selectedNormalized.includes(platform.id.toLowerCase());
         await tx.execute(
           'INSERT INTO server_platforms (guild_id, platform, enabled) VALUES ($1, $2, $3)',
-          [guildId, platform.id, isEnabled]
+          [guildId, platform.id.toLowerCase(), isEnabled]
         );
       }
     });
