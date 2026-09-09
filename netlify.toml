@@ -10,7 +10,8 @@
   schedule = "0 */2 * * *" # Runs every 2 hours UTC
 
 [functions."daily-digest"]
-  schedule = "0 * * * *"   # Runs hourly to evaluate each server's local morning time
+  schedule = "0,30 * * * *"   # Runs every 30 mins to evaluate each server's local morning time (supports half-hour timezones like IST)
 
 [functions."weekly-digest"]
-  schedule = "0 * * * *"   # Runs hourly to evaluate each server's local Monday morning time
+  schedule = "0,30 * * * *"   # Runs every 30 mins to evaluate each server's local Monday morning time (supports half-hour timezones like IST)
+
