@@ -2,10 +2,11 @@ import { Handler } from '@netlify/functions';
 import { executeWeeklyDigest } from '../../src/digests/weekly.js';
 import { logger } from '../../src/utils/logger.js';
 
-export const handler: Handler = async () => {
-  logger.info('Manual trigger: Weekly Digest');
+export const handler: Handler = async (event) => {
+  const force = event.queryStringParameters?.force === 'true';
+  logger.info(`Trigger: Weekly Digest (force=${force})`);
   try {
-    const result = await executeWeeklyDigest({ force: true });
+    const result = await executeWeeklyDigest({ force });
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
